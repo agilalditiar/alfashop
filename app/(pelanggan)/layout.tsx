@@ -22,14 +22,19 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
       <div className="w-full max-w-md bg-[#fef7ff] h-full relative shadow-2xl flex flex-col">
         
         {/* HEADER */}
-        <header className="shrink-0 bg-white/90 backdrop-blur-md border-b border-[#ffe4e6] z-50 flex justify-between items-center px-6 h-16">
-          <h1 className="text-2xl font-black text-[#7c3aed] tracking-tighter">AlfaShop</h1>
+        <header className="relative shrink-0 bg-white/90 backdrop-blur-md border-b border-[#ffe4e6] z-50 flex justify-between items-center px-6 h-16">
+          <Link href="/" className="text-2xl font-black text-[#7c3aed] tracking-tighter cursor-pointer">
+            AlfaShop
+          </Link>
           
-          {/* PERBAIKAN: Mengganti <button> menjadi <Link href="/login"> */}
-          <Link href="/login" className="hover:bg-[#fff1f2] p-1.5 rounded-full transition-colors active:scale-95 cursor-pointer">
+          {/* TOMBOL LOGIN (Sudah diperkuat anti-macet) */}
+          <Link 
+            href="/login" 
+            className="relative z-[999] flex items-center justify-center hover:bg-[#fff1f2] p-2 rounded-full transition-all active:scale-95 cursor-pointer pointer-events-auto"
+          >
             {userData ? (
               <div className="w-8 h-8 rounded-full bg-[#eaddff] text-[#630ed4] flex items-center justify-center font-bold text-xs border border-[#ccc3d8]">
-                {userData.name.substring(0, 2).toUpperCase()}
+                {userData?.name?.substring(0, 2).toUpperCase() || 'US'}
               </div>
             ) : (
               <User size={24} className="text-[#7c3aed]" />
@@ -38,12 +43,12 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
         </header>
 
         {/* KONTEN UTAMA */}
-        <main className="flex-1 overflow-y-auto hide-scrollbar bg-[#fef7ff]">
+        <main className="flex-1 overflow-y-auto hide-scrollbar bg-[#fef7ff] relative z-10">
           {children}
         </main>
         
-        {/* PERBAIKAN: Menghapus syarat {userData && ...} agar navigasi selalu muncul */}
-        <nav className="shrink-0 bg-white/95 backdrop-blur-lg border-t border-[#ffe4e6] z-50 flex justify-around items-center px-4 h-20 shadow-[0_-4px_20px_rgba(124,58,237,0.05)]">
+        {/* NAVIGASI BAWAH (Gembok dilepas, pasti muncul!) */}
+        <nav className="relative shrink-0 bg-white/95 backdrop-blur-lg border-t border-[#ffe4e6] z-50 flex justify-around items-center px-4 h-20 shadow-[0_-4px_20px_rgba(124,58,237,0.05)]">
           <Link href="/" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
             <Home size={24} strokeWidth={pathname === '/' ? 2.5 : 2} className="mb-1" />
             <span className="text-[11px] font-semibold">Beranda</span>
