@@ -27,7 +27,7 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
             AlfaShop
           </Link>
           
-          {/* TOMBOL LOGIN (Sudah diperkuat anti-macet) */}
+          {/* TOMBOL LOGIN */}
           <Link 
             href="/login" 
             className="relative z-[999] flex items-center justify-center hover:bg-[#fff1f2] p-2 rounded-full transition-all active:scale-95 cursor-pointer pointer-events-auto"
@@ -47,30 +47,32 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
           {children}
         </main>
         
-        {/* NAVIGASI BAWAH (Gembok dilepas, pasti muncul!) */}
-        <nav className="relative shrink-0 bg-white/95 backdrop-blur-lg border-t border-[#ffe4e6] z-50 flex justify-around items-center px-4 h-20 shadow-[0_-4px_20px_rgba(124,58,237,0.05)]">
-          <Link href="/" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
-            <Home size={24} strokeWidth={pathname === '/' ? 2.5 : 2} className="mb-1" />
-            <span className="text-[11px] font-semibold">Beranda</span>
-          </Link>
-          
-          <Link href="/checkout" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/checkout' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
-            <div className="relative">
-              <ShoppingCart size={24} strokeWidth={pathname === '/checkout' ? 2.5 : 2} className="mb-1" />
-              {cart.length > 0 && (
-                <span className="absolute -top-1 -right-2 bg-[#fb7185] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
-                  {cart.length}
-                </span>
-              )}
-            </div>
-            <span className="text-[11px] font-semibold">Keranjang</span>
-          </Link>
-          
-          <Link href="/riwayat" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/riwayat' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
-            <History size={24} strokeWidth={pathname === '/riwayat' ? 2.5 : 2} className="mb-1" />
-            <span className="text-[11px] font-semibold">Riwayat</span>
-          </Link>
-        </nav>
+        {/* NAVIGASI BAWAH (Sekarang hanya muncul jika userData ada/sudah login) */}
+        {userData && (
+          <nav className="relative shrink-0 bg-white/95 backdrop-blur-lg border-t border-[#ffe4e6] z-50 flex justify-around items-center px-4 h-20 shadow-[0_-4px_20px_rgba(124,58,237,0.05)]">
+            <Link href="/" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
+              <Home size={24} strokeWidth={pathname === '/' ? 2.5 : 2} className="mb-1" />
+              <span className="text-[11px] font-semibold">Beranda</span>
+            </Link>
+            
+            <Link href="/checkout" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/checkout' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
+              <div className="relative">
+                <ShoppingCart size={24} strokeWidth={pathname === '/checkout' ? 2.5 : 2} className="mb-1" />
+                {cart.length > 0 && (
+                  <span className="absolute -top-1 -right-2 bg-[#fb7185] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
+                    {cart.length}
+                  </span>
+                )}
+              </div>
+              <span className="text-[11px] font-semibold">Keranjang</span>
+            </Link>
+            
+            <Link href="/riwayat" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/riwayat' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
+              <History size={24} strokeWidth={pathname === '/riwayat' ? 2.5 : 2} className="mb-1" />
+              <span className="text-[11px] font-semibold">Riwayat</span>
+            </Link>
+          </nav>
+        )}
 
       </div>
     </div>
