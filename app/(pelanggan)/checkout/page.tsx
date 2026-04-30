@@ -3,13 +3,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { useCartStore } from '@/store/cartStore';
-import { Trash2, Plus, Minus, ShoppingBag, MapPin, User, Truck, PackageOpen, Navigation, Map, ChevronLeft } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingBag, MapPin, User, Truck, PackageOpen, Navigation, Map, ChevronLeft, Store } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CheckoutPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
+  
+  // STATE BARU: Untuk melacak pilihan metode pengiriman
+  const [metodeKirim, setMetodeKirim] = useState('Antar Kurir');
   
   const cart = useCartStore((state) => state.cart);
   const updateQty = useCartStore((state) => state.updateQty);
@@ -56,7 +59,8 @@ export default function CheckoutPage() {
   };
 
   const subtotal = cart.reduce((acc, item) => acc + (item.harga * item.qty), 0);
-  const ongkosKirim = subtotal > 0 ? 2000 : 0; 
+  // Ongkir Rp 2.000 HANYA JIKA pilih Antar Kurir
+  const ongkosKirim = (subtotal > 0 && metodeKirim === 'Antar Kurir') ? 2000 : 0; 
   const totalAkhir = subtotal + ongkosKirim;
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -71,31 +75,40 @@ export default function CheckoutPage() {
         address: formData.alamat
     }));
 
+    // Sesuaikan alamat berdasarkan metode
+    const alamatFinal = metodeKirim === 'Ambil di Toko' 
+      ? 'Ambil di Toko' 
+      : formData.alamat + (formData.lokasi_maps ? ` (Lokasi GPS: ${formData.lokasi_maps})` : '');
+
     const { error } = await supabase.from('pesanan').insert([{
       nama_pelanggan: formData.nama,
       whatsapp: formData.whatsapp,
-      alamat: formData.alamat + (formData.lokasi_maps ? ` (Lokasi GPS: ${formData.lokasi_maps})` : ''),
+      alamat: alamatFinal,
       total_harga: totalAkhir,
       item_pesanan: cart.map(c => ({ id: c.id, name: c.nama_produk, price: c.harga, quantity: c.qty, type: c.satuan })),
       status: 'Menunggu'
     }]);
-if (!error) {
-      const nomorAdmin = "6287728450708"; // TODO: GANTI DENGAN NOMOR WA ADMIN
+
+    if (!error) {
+      const nomorAdmin = "6287728450708"; 
       
-      // 1. Format Detail Pesanan (Kembalikan harga per item)
+      // 1. Format Detail Pesanan
       let detailPesanan = cart.map(item => 
         `▪️ ${item.qty}x ${item.nama_produk} *(Rp ${(item.harga * item.qty).toLocaleString('id-ID')})*`
       ).join('%0A');
       
-      // 2. Format Link GPS (Lebih menonjol)
-      const linkGps = formData.lokasi_maps ? `%0A📍 *Sharelok GPS:*%0A${formData.lokasi_maps}` : '';
+      // 2. Format Link GPS (Hanya jika Antar Kurir dan ada GPS)
+      const linkGps = (formData.lokasi_maps && metodeKirim === 'Antar Kurir') ? `%0A📍 *Sharelok GPS:*%0A${formData.lokasi_maps}` : '';
+      const alamatTampil = metodeKirim === 'Ambil di Toko' ? 'Ambil Sendiri di Toko' : formData.alamat;
       
-      // 3. Format Pesan Keseluruhan (Ditambah Emoji & Spasi rapi)
-      const pesanWA = `Halo Admin AlfaShop! 🛒 Ada pesanan baru nih.%0A%0A👤 *DATA PEMBELI:*%0A- Nama: ${formData.nama}%0A- WA: ${formData.whatsapp}%0A- Alamat: ${formData.alamat}${linkGps}%0A%0A🛍️ *DETAIL PESANAN:*%0A${detailPesanan}%0A%0A💰 *TOTAL BAYAR: Rp ${totalAkhir.toLocaleString('id-ID')}*%0A%0AMohon segera diproses ya. Terima kasih! 🙏`;
+      // 3. Format Pesan Keseluruhan (Ditambah info Metode Kirim)
+      const pesanWA = `Halo Admin AlfaShop! 🛒 Ada pesanan baru nih.%0A%0A👤 *DATA PEMBELI:*%0A- Nama: ${formData.nama}%0A- WA: ${formData.whatsapp}%0A- Metode: *${metodeKirim}*%0A- Alamat: ${alamatTampil}${linkGps}%0A%0A🛍️ *DETAIL PESANAN:*%0A${detailPesanan}%0A%0A💰 *TOTAL BAYAR: Rp ${totalAkhir.toLocaleString('id-ID')}*%0A%0AMohon segera diproses ya. Terima kasih! 🙏`;
       
       window.open(`https://wa.me/${nomorAdmin}?text=${pesanWA}`, '_blank');
       clearCart(); 
       router.push('/sukses'); 
+    } else {
+      alert("Terjadi kesalahan saat menyimpan pesanan. Silakan coba lagi.");
     }
     setIsSubmitting(false);
   };
@@ -141,25 +154,55 @@ if (!error) {
           </div>
         </section>
 
-        {/* ALAMAT & GPS */}
+        {/* METODE PENGIRIMAN (FITUR BARU) */}
         <section className="bg-white rounded-3xl border border-[#ffe4e6] p-6 shadow-sm space-y-4">
-          <div className="flex justify-between items-center mb-2">
-            <h2 className="text-sm font-black text-[#630ed4] uppercase tracking-widest flex items-center gap-2">
-              <MapPin size={16} /> Alamat Kirim
-            </h2>
-            <button 
-              type="button" onClick={handleGetLocation} disabled={isGettingLocation}
-              className={`text-[10px] flex items-center gap-1.5 font-black px-3 py-2 rounded-full transition-all border ${formData.lokasi_maps ? 'bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]' : 'bg-[#f3ebfa] text-[#7c3aed] border-[#eaddff] active:scale-95'}`}
+          <h2 className="text-sm font-black text-[#630ed4] uppercase tracking-widest mb-2">Metode Pengiriman</h2>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setMetodeKirim('Ambil di Toko')}
+              className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all active:scale-95 ${
+                metodeKirim === 'Ambil di Toko' ? 'border-[#7c3aed] bg-[#fff1f2] text-[#7c3aed]' : 'border-gray-200 bg-white text-gray-500'
+              }`}
             >
-              {isGettingLocation ? 'Mencari...' : formData.lokasi_maps ? <><Map size={12}/> Lokasi Terkunci</> : <><Navigation size={12}/> Ambil GPS</>}
+              <Store size={24} className="mb-2" />
+              <span className="text-xs font-bold">Ambil di Toko</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMetodeKirim('Antar Kurir')}
+              className={`flex-1 flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all active:scale-95 ${
+                metodeKirim === 'Antar Kurir' ? 'border-[#7c3aed] bg-[#fff1f2] text-[#7c3aed]' : 'border-gray-200 bg-white text-gray-500'
+              }`}
+            >
+              <Truck size={24} className="mb-2" />
+              <span className="text-xs font-bold">Antar Kurir</span>
             </button>
           </div>
-          <textarea 
-            required rows={3} value={formData.alamat} onChange={(e) => setFormData({...formData, alamat: e.target.value})} 
-            className="w-full bg-[#fef7ff] border border-[#ccc3d8] rounded-2xl px-5 py-4 text-sm font-bold text-[#1d1a24] outline-none focus:ring-2 focus:ring-[#7c3aed] transition-all resize-none placeholder:text-[#ccc3d8]" 
-            placeholder="Tulis alamat lengkap & patokan rumah..." 
-          />
         </section>
+
+        {/* ALAMAT & GPS (Hanya muncul jika pilih Antar Kurir) */}
+        {metodeKirim === 'Antar Kurir' && (
+          <section className="bg-white rounded-3xl border border-[#ffe4e6] p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2">
+            <div className="flex justify-between items-center mb-2">
+              <h2 className="text-sm font-black text-[#630ed4] uppercase tracking-widest flex items-center gap-2">
+                <MapPin size={16} /> Alamat Kirim
+              </h2>
+              <button 
+                type="button" onClick={handleGetLocation} disabled={isGettingLocation}
+                className={`text-[10px] flex items-center gap-1.5 font-black px-3 py-2 rounded-full transition-all border ${formData.lokasi_maps ? 'bg-[#ecfdf5] text-[#059669] border-[#a7f3d0]' : 'bg-[#f3ebfa] text-[#7c3aed] border-[#eaddff] active:scale-95'}`}
+              >
+                {isGettingLocation ? 'Mencari...' : formData.lokasi_maps ? <><Map size={12}/> Lokasi Terkunci</> : <><Navigation size={12}/> Ambil GPS</>}
+              </button>
+            </div>
+            <textarea 
+              required={metodeKirim === 'Antar Kurir'} 
+              rows={3} value={formData.alamat} onChange={(e) => setFormData({...formData, alamat: e.target.value})} 
+              className="w-full bg-[#fef7ff] border border-[#ccc3d8] rounded-2xl px-5 py-4 text-sm font-bold text-[#1d1a24] outline-none focus:ring-2 focus:ring-[#7c3aed] transition-all resize-none placeholder:text-[#ccc3d8]" 
+              placeholder="Tulis alamat lengkap & patokan rumah..." 
+            />
+          </section>
+        )}
 
         {/* RINGKASAN ITEM */}
         <section className="bg-white rounded-3xl border border-[#ffe4e6] p-6 shadow-sm">
@@ -180,8 +223,14 @@ if (!error) {
             ))}
           </div>
           <div className="mt-4 pt-4 border-t border-dashed border-[#ccc3d8] space-y-2">
-            <div className="flex justify-between text-xs font-bold text-[#7b7487]"><span>Biaya Layanan</span><span>Rp {ongkosKirim.toLocaleString()}</span></div>
-            <div className="flex justify-between text-lg font-black text-[#630ed4]"><span>Total Bayar</span><span>Rp {totalAkhir.toLocaleString('id-ID')}</span></div>
+            <div className="flex justify-between text-xs font-bold text-[#7b7487]">
+              <span>Biaya Layanan/Ongkir</span>
+              <span>{ongkosKirim === 0 ? 'Gratis' : `Rp ${ongkosKirim.toLocaleString()}`}</span>
+            </div>
+            <div className="flex justify-between text-lg font-black text-[#630ed4]">
+              <span>Total Bayar</span>
+              <span>Rp {totalAkhir.toLocaleString('id-ID')}</span>
+            </div>
           </div>
         </section>
 
@@ -192,7 +241,9 @@ if (!error) {
         >
           {isSubmitting ? 'MEMPROSES...' : <><ShoppingBag size={20} /> PESAN SEKARANG (COD)</>}
         </button>
-        <p className="text-[10px] text-center text-[#7b7487] font-bold uppercase tracking-widest">Bayar tunai saat barang sampai di rumah</p>
+        <p className="text-[10px] text-center text-[#7b7487] font-bold uppercase tracking-widest">
+          {metodeKirim === 'Ambil di Toko' ? 'Bayar di kasir saat mengambil pesanan' : 'Bayar tunai saat barang sampai di rumah'}
+        </p>
 
       </form>
     </div>
