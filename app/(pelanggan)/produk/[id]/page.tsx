@@ -2,69 +2,81 @@
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useUserStore } from '@/store/userStore'; 
+import { useUserStore } from '@/store/userStore';
 
 export default function DetailProduk() {
   const router = useRouter();
-  
-  // Memanggil status login dari otak Zustand yang baru dibuat
   const user = useUserStore((state) => state.user);
 
-  // Fungsi pencegat saat tombol keranjang dipencet
   const handleAddToCart = () => {
     if (!user) {
       alert("Oops! Silakan Login terlebih dahulu untuk mulai berbelanja.");
-      router.push('/login'); // Lempar ke halaman login
+      router.push('/login');
       return;
     }
-    
-    // Jika sudah login, lanjutkan aksi tambah keranjang
     alert("Produk berhasil ditambahkan ke keranjang!");
-    
-    // TODO: Nanti panggil fungsi addToCart dari useCartStore kamu di sini
-    // contoh: addToCart({ id: 1, nama_produk: 'Beras', harga: 65000, qty: 1 })
+    // TODO: Logika Zustand keranjang dimasukkan di sini
   };
 
   return (
-    <div className="w-full min-h-screen bg-[#fef7ff] pb-24">
+    // Tambahkan pb-32 agar konten tidak tertutup navigasi bawah!
+    <div className="w-full min-h-screen bg-[#fef7ff] pb-32">
       
       {/* Tombol Kembali */}
       <div className="absolute top-4 left-4 z-20">
-        <Link href="/" className="flex items-center justify-center w-10 h-10 bg-white/80 backdrop-blur-md rounded-full shadow-md text-[#7c3aed] active:scale-95 transition-transform">
+        <button onClick={() => router.back()} className="flex items-center justify-center w-10 h-10 bg-white/80 backdrop-blur-md rounded-full shadow-md text-[#7c3aed] active:scale-95 transition-transform">
           <ArrowLeft size={20} />
-        </Link>
+        </button>
       </div>
 
-      {/* Gambar Produk */}
-      <div className="w-full aspect-square bg-white relative">
+      {/* GAMBAR PRODUK: Dipaksa kotak presisi dan memenuhi layar */}
+      <div className="w-full aspect-square bg-gray-100 relative overflow-hidden">
         <img 
-          src="https://via.placeholder.com/500" // Nanti sesuaikan dengan URL gambar Supabase
-          alt="Gambar Produk"
-          className="w-full h-full object-cover"
+          src="https://via.placeholder.com/500" // Ganti dengan variabel gambar dari database kamu
+          alt="Tepung Terigu Segitiga Biru"
+          className="absolute inset-0 w-full h-full object-cover" // Kunci agar tidak ada spasi putih
         />
       </div>
 
-      {/* Area Deskripsi */}
-      <div className="p-5 bg-white rounded-t-3xl -mt-6 relative z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] min-h-[50vh]">
-        <h1 className="text-2xl font-bold text-gray-900 leading-tight break-words">
-          Beras Maknyus 5 Kg Premium
-        </h1>
-        <p className="text-xl font-black text-[#7c3aed] mt-2">Rp 65.000</p>
+      {/* AREA DESKRIPSI: Melengkung estetik */}
+      <div className="p-6 bg-white rounded-t-3xl -mt-6 relative z-10 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] min-h-[50vh]">
+        
+        {/* Kategori */}
+        <p className="text-xs font-black text-[#630ed4] uppercase tracking-widest mb-3">
+          Kategori: Bumbu Dapur
+        </p>
 
-        <div className="mt-6">
-          <h3 className="font-semibold text-gray-800 mb-2">Deskripsi Produk</h3>
-          <p className="text-sm text-gray-600 leading-relaxed text-justify">
-            Beras kualitas premium yang diproses dengan teknologi modern sehingga menghasilkan tekstur nasi yang pulen dan wangi. Cocok untuk hidangan keluarga sehari-hari.
+        {/* Judul Produk */}
+        <h1 className="text-2xl sm:text-3xl font-black text-[#1d1a24] leading-tight break-words mb-3">
+          Tepung Terigu Segitiga Biru 1kg - Ekonomis, Lembut, Cocok untuk Berbagai Kue
+        </h1>
+        
+        {/* Harga */}
+        <div className="flex items-baseline gap-1 mb-6">
+          <span className="text-3xl font-black text-[#7c3aed]">Rp 16.000</span>
+          <span className="text-sm font-semibold text-[#7b7487]">/Ecer</span>
+        </div>
+
+        {/* Garis Pemisah */}
+        <div className="w-full h-px bg-[#ffe4e6] mb-6"></div>
+
+        {/* Teks Deskripsi */}
+        <div className="mb-8">
+          <h3 className="font-bold text-[#1d1a24] mb-3 flex items-center gap-2">
+            Detail Produk
+          </h3>
+          <p className="text-sm text-[#7b7487] leading-relaxed text-justify">
+            Tepung terigu protein sedang yang cocok untuk membuat aneka makanan seperti bolu, brownies, cake pisang, martabak manis, muffin, kue lumpur, ayam goreng, dan aneka jajanan pasar lainnya.
           </p>
         </div>
 
-        {/* Tombol Tambah ke Keranjang (Sudah dilindungi penjaga cerdas) */}
+        {/* Tombol Tambah ke Keranjang */}
         <button 
           onClick={handleAddToCart}
-          className="w-full mt-8 bg-[#7c3aed] text-white py-3.5 rounded-xl font-bold shadow-lg shadow-purple-200 active:scale-95 transition-transform flex justify-center items-center gap-2"
+          className="w-full bg-[#630ed4] text-white py-4 rounded-2xl font-black shadow-[0_8px_20px_rgba(99,14,212,0.25)] hover:bg-[#732ee4] active:scale-[0.98] transition-all flex justify-center items-center gap-3"
         >
-          <ShoppingCart size={20} />
-          Tambah ke Keranjang
+          <ShoppingCart size={22} />
+          MASUKKAN KERANJANG
         </button>
       </div>
     </div>
