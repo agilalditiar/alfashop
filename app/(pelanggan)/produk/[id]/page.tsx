@@ -1,5 +1,5 @@
 'use client';
-import { ArrowLeft, ShoppingCart } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, User, Heart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useUserStore } from '@/store/userStore';
 
@@ -17,80 +17,84 @@ export default function DetailProduk() {
   };
 
   return (
-    // Tambahkan 'relative' di sini agar tombol back tidak lari ke luar angkasa
-    <div className="w-full flex flex-col pb-28 relative">
+    // PENGAMAN UTAMA: max-w-md mx-auto akan mengunci lebar layar persis seperti HP
+    <div className="w-full max-w-md mx-auto flex flex-col min-h-screen bg-[#fef7ff] relative shadow-2xl overflow-hidden">
       
-      {/* TOMBOL KEMBALI (Super Prioritas) */}
-      <button 
-        onClick={() => router.back()} 
-        className="absolute top-4 left-4 z-[99] flex items-center justify-center w-11 h-11 bg-white border border-[#ffe4e6] rounded-full shadow-lg text-[#1d1a24] active:scale-90 transition-transform"
-      >
-        <ArrowLeft size={24} />
-      </button>
+      {/* HEADER BAR (Menyatu rapi di atas) */}
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-[#ffe4e6] px-4 h-16 flex items-center justify-between">
+        <button onClick={() => router.back()} className="text-[#1d1a24] active:scale-90 transition-transform p-2 bg-[#f3ebfa] rounded-full">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="text-xl font-black text-[#630ed4] tracking-tight">AlfaShop</h1>
+        <div className="flex items-center gap-1">
+          <button className="text-[#7c3aed] p-2 active:scale-90"><Heart size={20} /></button>
+        </div>
+      </header>
 
-      {/* AREA GAMBAR (Background putih agar menyatu dengan gambar produk) */}
-      <div className="w-full aspect-square bg-white flex items-center justify-center overflow-hidden">
-        <img 
-          src="https://via.placeholder.com/500" // Nanti ganti dengan gambar database
-          alt="Mie Sedaap Goreng"
-          className="w-full h-full object-contain" // object-contain memastikan gambar tidak terpotong
-        />
-      </div>
-
-      {/* AREA DESKRIPSI (Melengkung naik ke atas gambar) */}
-      <div className="bg-white rounded-t-3xl -mt-8 relative z-20 px-6 pt-8 pb-8 shadow-[0_-10px_25px_rgba(0,0,0,0.06)] min-h-[55vh] flex flex-col">
+      {/* KONTEN BISA DI-SCROLL, TAPI TERKUNCI DI TENGAH */}
+      <main className="flex-1 overflow-y-auto pb-32 hide-scrollbar">
         
-        {/* Kategori */}
-        <p className="text-[10px] font-black text-[#630ed4] uppercase tracking-widest mb-3">
-          Kategori: Mie & Instan
-        </p>
-
-        {/* Judul Produk */}
-        <h1 className="text-2xl sm:text-3xl font-black text-[#1d1a24] leading-snug break-words mb-2">
-          Mie Sedaap Goreng
-        </h1>
-        
-        {/* Harga */}
-        <div className="flex items-baseline gap-1 mb-5">
-          <span className="text-3xl font-black text-[#7c3aed]">Rp 3.500</span>
-          <span className="text-sm font-bold text-[#7b7487]">/Ecer</span>
+        {/* AREA GAMBAR */}
+        <div className="w-full aspect-square bg-white flex items-center justify-center relative">
+          <img 
+            src="https://via.placeholder.com/500" // Ganti dengan gambar database
+            alt="Mie Sedaap Goreng"
+            className="absolute inset-0 w-full h-full object-contain p-4" 
+          />
         </div>
 
-        {/* Badges / Label Tambahan */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <span className="px-3 py-1.5 bg-[#f3ebfa] text-[#630ed4] rounded-full text-xs font-bold border border-[#eaddff] flex items-center gap-1">
-            ✓ Pilihan Terbaik
-          </span>
-          <span className="px-3 py-1.5 bg-[#ecfdf5] text-[#059669] rounded-full text-xs font-bold border border-[#a7f3d0] flex items-center gap-1">
-            🌱 Segar & Aman
-          </span>
-          <span className="px-3 py-1.5 bg-[#fff1f2] text-[#e11d48] rounded-full text-xs font-bold border border-[#ffe4e6] flex items-center gap-1">
-            ⏱️ Tersedia
-          </span>
-        </div>
-
-        <div className="w-full h-px bg-[#f3ebfa] mb-6"></div>
-
-        {/* Detail Teks */}
-        <div className="mb-10">
-          <h3 className="text-sm font-black text-[#1d1a24] mb-3">
-            Detail Produk
-          </h3>
-          <p className="text-sm text-[#7b7487] leading-relaxed text-justify">
-            Mie Sedaap Goreng dengan taburan bawang goreng kress yang nikmat. Diproses secara higienis dengan tekstur mie yang kenyal dan tidak mudah hancur. Cocok untuk dinikmati kapan saja.
+        {/* AREA DESKRIPSI (Melengkung estetik) */}
+        <div className="bg-white rounded-t-3xl -mt-6 relative z-20 px-6 pt-8 pb-8 shadow-[0_-10px_25px_rgba(0,0,0,0.04)] min-h-[60vh]">
+          
+          <p className="text-[10px] font-black text-[#630ed4] uppercase tracking-widest mb-3">
+            Kategori: Mie & Instan
           </p>
-        </div>
 
-        {/* Tombol Keranjang (Otomatis terdorong ke paling bawah konten) */}
+          <h1 className="text-2xl font-black text-[#1d1a24] leading-snug break-words mb-2">
+            Mie Sedaap Goreng
+          </h1>
+          
+          <div className="flex items-baseline gap-1 mb-5">
+            <span className="text-3xl font-black text-[#7c3aed]">Rp 3.500</span>
+            <span className="text-sm font-bold text-[#7b7487]">/Ecer</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-6">
+            <span className="px-3 py-1.5 bg-[#f3ebfa] text-[#630ed4] rounded-full text-xs font-bold border border-[#eaddff]">
+              ✓ Pilihan Terbaik
+            </span>
+            <span className="px-3 py-1.5 bg-[#ecfdf5] text-[#059669] rounded-full text-xs font-bold border border-[#a7f3d0]">
+              🌱 Segar & Aman
+            </span>
+            <span className="px-3 py-1.5 bg-[#fff1f2] text-[#e11d48] rounded-full text-xs font-bold border border-[#ffe4e6]">
+              ⏱️ Tersedia
+            </span>
+          </div>
+
+          <div className="w-full h-px bg-[#f3ebfa] mb-6"></div>
+
+          <div className="mb-4">
+            <h3 className="text-sm font-black text-[#1d1a24] mb-3">
+              Deskripsi Produk
+            </h3>
+            <p className="text-sm text-[#7b7487] leading-relaxed text-justify">
+              Original Mie Sedaap Mie goreng dari indonesia. 90g/pack. Keluaran dari Wingsfood indonesia. Original imported from indonesia. #rasa original indonesia. Tidak sama dengan keluaran di malaysia.
+            </p>
+          </div>
+        </div>
+      </main>
+
+      {/* TOMBOL KERANJANG (Terkunci di bawah khusus untuk layar HP ini) */}
+      <div className="absolute bottom-0 left-0 w-full bg-white border-t border-[#ffe4e6] p-4 z-50 shadow-[0_-10px_30px_rgba(99,14,212,0.08)]">
         <button 
           onClick={handleAddToCart}
-          className="w-full mt-auto bg-[#630ed4] text-white py-4 rounded-2xl font-black shadow-[0_8px_20px_rgba(99,14,212,0.25)] hover:bg-[#732ee4] active:scale-95 transition-transform flex justify-center items-center gap-2"
+          className="w-full bg-[#630ed4] text-white py-4 rounded-2xl font-black shadow-[0_8px_20px_rgba(99,14,212,0.25)] hover:bg-[#732ee4] active:scale-95 transition-transform flex justify-center items-center gap-2"
         >
           <ShoppingCart size={22} />
-          MASUKKAN KERANJANG
+          Tambah ke Keranjang
         </button>
-
       </div>
+
     </div>
   );
 }
