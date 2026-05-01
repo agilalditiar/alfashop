@@ -1,24 +1,18 @@
 'use client';
-import { useState, useEffect } from 'react';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Tambahan untuk memindahkan halaman
+import { useRouter } from 'next/navigation';
+import { useUserStore } from '@/store/userStore'; 
 
 export default function DetailProduk() {
   const router = useRouter();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  
+  // Memanggil status login dari otak Zustand yang baru dibuat
+  const user = useUserStore((state) => state.user);
 
-  // Cek apakah user sudah login saat halaman dibuka
-  useEffect(() => {
-    const user = localStorage.getItem('alfaShopUser');
-    if (user) {
-      setIsLoggedIn(true);
-    }
-  }, []);
-
-  // Fungsi saat tombol keranjang dipencet
+  // Fungsi pencegat saat tombol keranjang dipencet
   const handleAddToCart = () => {
-    if (!isLoggedIn) {
+    if (!user) {
       alert("Oops! Silakan Login terlebih dahulu untuk mulai berbelanja.");
       router.push('/login'); // Lempar ke halaman login
       return;
@@ -26,7 +20,9 @@ export default function DetailProduk() {
     
     // Jika sudah login, lanjutkan aksi tambah keranjang
     alert("Produk berhasil ditambahkan ke keranjang!");
-    // Panggil fungsi addToCart dari Zustand/Store kamu di sini nanti
+    
+    // TODO: Nanti panggil fungsi addToCart dari useCartStore kamu di sini
+    // contoh: addToCart({ id: 1, nama_produk: 'Beras', harga: 65000, qty: 1 })
   };
 
   return (
@@ -42,7 +38,7 @@ export default function DetailProduk() {
       {/* Gambar Produk */}
       <div className="w-full aspect-square bg-white relative">
         <img 
-          src="https://via.placeholder.com/500" 
+          src="https://via.placeholder.com/500" // Nanti sesuaikan dengan URL gambar Supabase
           alt="Gambar Produk"
           className="w-full h-full object-cover"
         />
@@ -62,7 +58,7 @@ export default function DetailProduk() {
           </p>
         </div>
 
-        {/* Tombol Tambah ke Keranjang (Sudah dilindungi) */}
+        {/* Tombol Tambah ke Keranjang (Sudah dilindungi penjaga cerdas) */}
         <button 
           onClick={handleAddToCart}
           className="w-full mt-8 bg-[#7c3aed] text-white py-3.5 rounded-xl font-bold shadow-lg shadow-purple-200 active:scale-95 transition-transform flex justify-center items-center gap-2"

@@ -2,10 +2,14 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { ShoppingBasket, ShieldCheck, User, Phone, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { useUserStore } from '@/store/userStore'; // Otak Zustand kita
+import { ShoppingBasket, ShieldCheck, User, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
+  
+  // PANGGIL FUNGSI LOGIN DARI ZUSTAND
+  const login = useUserStore((state) => state.login);
   
   // State untuk Tab
   const [mode, setMode] = useState<'pelanggan' | 'admin'>('pelanggan');
@@ -22,7 +26,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // --- LOGIKA LOGIN PELANGGAN ---
+  // --- LOGIKA LOGIN PELANGGAN (SUDAH DIPERBAIKI) ---
   const handleLoginPelanggan = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nama || !whatsapp) {
@@ -31,9 +35,12 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    // Simpan data pelanggan di memori browser (Local Storage)
-    localStorage.setItem('alfa_nama_pelanggan', nama);
-    localStorage.setItem('alfa_wa_pelanggan', whatsapp);
+    
+    // GUNAKAN FUNGSI LOGIN DARI ZUSTAND (Akan otomatis menyimpan ke localStorage & memicu navigasi muncul)
+    login({ 
+      name: nama, 
+      phone: whatsapp 
+    });
     
     // Arahkan langsung ke beranda belanja
     setTimeout(() => {

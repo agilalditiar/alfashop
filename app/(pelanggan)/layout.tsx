@@ -4,18 +4,24 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Home, ShoppingCart, History, User } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
+import { useUserStore } from '@/store/userStore'; // Import otak baru kita
 
 export default function PelangganLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const cart = useCartStore((state) => state.cart);
-  const [userData, setUserData] = useState<any>(null);
+  
+  // Panggil user dan fungsi ceknya
+  const { user, checkLogin } = useUserStore();
+  const [isMounted, setIsMounted] = useState(false);
 
+  // Jalankan pengecekan HANYA SAAT web pertama kali dimuat
   useEffect(() => {
-    const storedUser = localStorage.getItem('alfaShopUser');
-    if (storedUser) {
-      setUserData(JSON.parse(storedUser));
-    }
-  }, []);
+    checkLogin();
+    setIsMounted(true);
+  }, [checkLogin]);
+
+  // Mencegah error "Hydration" Vercel
+  if (!isMounted) return null;
 
   return (
     <div className="bg-[#1d1a24] h-[100dvh] flex justify-center font-sans overflow-hidden">
@@ -27,14 +33,14 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
             AlfaShop
           </Link>
           
-          {/* TOMBOL LOGIN */}
+          {/* TOMBOL PROFIL / LOGIN */}
           <Link 
-            href="/login" 
+            href={user ? "/profil" : "/login"} // Kalau belum login, arahkan ke /login
             className="relative z-[999] flex items-center justify-center hover:bg-[#fff1f2] p-2 rounded-full transition-all active:scale-95 cursor-pointer pointer-events-auto"
           >
-            {userData ? (
+            {user ? (
               <div className="w-8 h-8 rounded-full bg-[#eaddff] text-[#630ed4] flex items-center justify-center font-bold text-xs border border-[#ccc3d8]">
-                {userData?.name?.substring(0, 2).toUpperCase() || 'US'}
+                {user?.name?.substring(0, 2).toUpperCase() || 'US'}
               </div>
             ) : (
               <User size={24} className="text-[#7c3aed]" />
@@ -47,8 +53,8 @@ export default function PelangganLayout({ children }: { children: React.ReactNod
           {children}
         </main>
         
-        {/* NAVIGASI BAWAH (Sekarang hanya muncul jika userData ada/sudah login) */}
-        {userData && (
+        {/* NAVIGASI BAWAH: HANYA MUNCUL JIKA SUDAH LOGIN */}
+        {user && (
           <nav className="relative shrink-0 bg-white/95 backdrop-blur-lg border-t border-[#ffe4e6] z-50 flex justify-around items-center px-4 h-20 shadow-[0_-4px_20px_rgba(124,58,237,0.05)]">
             <Link href="/" className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-xl transition-all active:scale-95 ${pathname === '/' ? 'bg-[#fff1f2] text-[#7c3aed]' : 'text-[#7b7487] hover:text-[#7c3aed]'}`}>
               <Home size={24} strokeWidth={pathname === '/' ? 2.5 : 2} className="mb-1" />
