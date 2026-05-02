@@ -1,41 +1,34 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom'; // 🪄 MANTRA AJAIB TELEPORTASI
+import { createPortal } from 'react-dom'; 
 import { supabase } from '@/lib/supabase';
 import { useCartStore } from '@/store/cartStore';
-import { ShoppingCart, PackageOpen, Plus, Search, CheckCircle2, ArrowLeft, Heart, CheckCircle, Leaf, Clock, Minus, MessageCircle } from 'lucide-react';
+import { ShoppingCart, PackageOpen, Plus, Search, CheckCircle2, ArrowLeft, Heart, CheckCircle, Leaf, Minus, MessageCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const DAFTAR_KATEGORI = [
-  'Semua', 
-  'Beras & Sembako', 
-  'Minuman', 
-  'Makanan Ringan', 
-  'Mie & Instan', 
-  'Sabun & Deterjen', 
-  'Bumbu Dapur', 
-  'Lainnya'
+  'Semua', 'Beras & Sembako', 'Minuman', 'Makanan Ringan', 'Mie & Instan', 'Sabun & Deterjen', 'Bumbu Dapur', 'Lainnya'
 ];
 
 export default function PelangganBeranda() {
   const [produkList, setProdukList] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isMounted, setIsMounted] = useState(false); // Penjaga Portal
+  const [isMounted, setIsMounted] = useState(false); 
   
   const [filterKategori, setFilterKategori] = useState('Semua');
   const [searchQuery, setSearchQuery] = useState('');
   
   const [selectedProduk, setSelectedProduk] = useState<any>(null);
   const [modalQty, setModalQty] = useState(1);
+  const [isLiked, setIsLiked] = useState(false); // STATE BARU: Untuk tombol hati
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const [flyingItems, setFlyingItems] = useState<{ id: number; x: number; y: number }[]>([]);
   
   const addToCart = useCartStore((state) => state.addToCart);
 
-  // Jalankan saat web dimuat
   useEffect(() => {
-    setIsMounted(true); // Buka gerbang portal
+    setIsMounted(true);
     const fetchProduk = async () => {
       const { data } = await supabase.from('produk').select('*').eq('tersedia', true);
       setProdukList(data || []);
@@ -44,11 +37,19 @@ export default function PelangganBeranda() {
     fetchProduk();
   }, []);
 
+  // Reset jumlah dan status favorit tiap kali membuka produk baru
   useEffect(() => {
-    if (selectedProduk) setModalQty(1);
+    if (selectedProduk) {
+      setModalQty(1);
+      setIsLiked(false);
+    }
   }, [selectedProduk]);
 
-  // Fungsi Tambah Keranjang Kilat
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
   const handleTambahCepat = (e: React.MouseEvent, produk: any) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
@@ -62,11 +63,9 @@ export default function PelangganBeranda() {
     setFlyingItems((prev) => [...prev, { id, x: startX, y: startY }]);
     setTimeout(() => setFlyingItems((prev) => prev.filter((item) => item.id !== id)), 800);
 
-    setToastMessage(`1x ${produk.nama_produk} ditambahkan`);
-    setTimeout(() => setToastMessage(null), 2500);
+    showToast(`1x ${produk.nama_produk} ditambahkan`);
   };
 
-  // Fungsi Tambah Keranjang dari Pop-up
   const handleBeliDariModal = () => {
     if (!selectedProduk) return;
     
@@ -80,11 +79,14 @@ export default function PelangganBeranda() {
     setFlyingItems((prev) => [...prev, { id, x: startX, y: startY }]);
     setTimeout(() => setFlyingItems((prev) => prev.filter((item) => item.id !== id)), 800);
 
-    setToastMessage(`${modalQty}x ${selectedProduk.nama_produk} ditambahkan`);
-    setTimeout(() => setToastMessage(null), 2500);
-    
-    // Tutup pop-up otomatis setelah masuk keranjang!
+    showToast(`${modalQty}x ${selectedProduk.nama_produk} ditambahkan`);
     setSelectedProduk(null); 
+  };
+
+  // Fungsi Tombol Hati (Favorit)
+  const handleToggleLike = () => {
+    setIsLiked(!isLiked);
+    showToast(!isLiked ? "Ditambahkan ke favorit ❤️" : "Dihapus dari favorit 🤍");
   };
 
   const filteredProduk = produkList.filter((p) => {
@@ -102,7 +104,7 @@ export default function PelangganBeranda() {
         {toastMessage && (
           <motion.div
             initial={{ y: -50, opacity: 0 }} animate={{ y: 16, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
-            className="fixed top-0 left-1/2 -translate-x-1/2 z-[150] bg-[#1d1a24] text-white px-5 py-3 rounded-full text-xs font-bold flex items-center gap-2 shadow-xl shadow-black/10"
+            className="fixed top-0 left-1/2 -translate-x-1/2 z-[999999] bg-[#1d1a24] text-white px-5 py-3 rounded-full text-xs font-bold flex items-center gap-2 shadow-xl shadow-black/10 whitespace-nowrap"
           >
             <CheckCircle2 size={16} className="text-[#34d399]" />
             {toastMessage}
@@ -110,7 +112,6 @@ export default function PelangganBeranda() {
         )}
       </AnimatePresence>
 
-      {/* BANNER PROMO */}
       <div className="bg-gradient-to-br from-[#8b5cf6] to-[#630ed4] rounded-[2rem] p-6 text-white shadow-[0_8px_30px_rgba(99,14,212,0.2)] mb-6 relative overflow-hidden">
         <div className="absolute -right-10 -top-10 w-40 h-40 bg-[#c4b5fd]/30 rounded-full blur-2xl"></div>
         <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-black/20 rounded-full blur-3xl"></div>
@@ -120,22 +121,14 @@ export default function PelangganBeranda() {
         </div>
       </div>
 
-      {/* PENCARIAN */}
       <div className="relative mb-6">
         <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#ccc3d8]" />
-        <input 
-          type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Cari kebutuhan dapur..." 
-          className="w-full bg-white border border-[#ffe4e6] rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-[#1d1a24] shadow-[0_4px_20px_rgba(124,58,237,0.03)] focus:ring-2 focus:ring-[#7c3aed] focus:border-transparent outline-none transition-all placeholder:text-[#ccc3d8]"
-        />
+        <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Cari kebutuhan dapur..." className="w-full bg-white border border-[#ffe4e6] rounded-2xl pl-12 pr-4 py-3.5 text-sm font-bold text-[#1d1a24] shadow-[0_4px_20px_rgba(124,58,237,0.03)] focus:ring-2 focus:ring-[#7c3aed] focus:border-transparent outline-none transition-all placeholder:text-[#ccc3d8]" />
         {searchQuery && (
-          <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7b7487] bg-[#f3ebfa] p-1.5 rounded-full hover:text-[#ba1a1a] active:scale-90">
-            <Plus size={14} className="rotate-45" />
-          </button>
+          <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#7b7487] bg-[#f3ebfa] p-1.5 rounded-full hover:text-[#ba1a1a] active:scale-90"><Plus size={14} className="rotate-45" /></button>
         )}
       </div>
 
-      {/* FILTER KATEGORI */}
       <div className="flex gap-3 overflow-x-auto pb-4 mb-4 hide-scrollbar">
         {DAFTAR_KATEGORI.map((kat) => (
           <button key={kat} onClick={() => setFilterKategori(kat)} className={`whitespace-nowrap px-5 py-2.5 rounded-full text-xs font-bold transition-all active:scale-95 ${filterKategori === kat ? 'bg-[#7c3aed] text-white shadow-md' : 'bg-[#fff1f2] text-[#7c3aed] border border-[#ffe4e6]'}`}>
@@ -144,7 +137,6 @@ export default function PelangganBeranda() {
         ))}
       </div>
 
-      {/* GRID PRODUK */}
       <div className="grid grid-cols-2 gap-4">
         {isLoading ? (
           [1, 2, 3, 4].map(n => <div key={n} className="bg-white rounded-xl border border-[#ffe4e6] p-4 animate-pulse"><div className="w-full aspect-square bg-[#fff1f2] rounded-lg mb-3"></div><div className="h-4 bg-[#eaddff] rounded w-3/4"></div></div>)
@@ -182,14 +174,16 @@ export default function PelangganBeranda() {
                 className="w-full max-w-md h-[95dvh] sm:h-[90vh] bg-[#fef7ff] relative flex flex-col rounded-t-[2rem] sm:rounded-3xl shadow-2xl overflow-hidden"
               >
                 
-                {/* Header Modal Melayang */}
                 <header className="absolute top-0 left-0 w-full z-50 bg-white/80 backdrop-blur-md flex items-center justify-between px-6 py-4 border-b border-[#ffe4e6]/50">
                   <button onClick={() => setSelectedProduk(null)} className="text-[#630ed4] active:scale-95 p-2 rounded-full bg-white shadow-sm border border-[#ffe4e6]"><ArrowLeft size={20} /></button>
                   <h1 className="text-sm font-black tracking-tight text-[#1d1a24] uppercase">Detail Produk</h1>
-                  <button className="text-[#fb7185] active:scale-95 p-2 rounded-full bg-white shadow-sm border border-[#ffe4e6]"><Heart size={20} /></button>
+                  
+                  {/* TOMBOL HATI (SUDAH AKTIF) */}
+                  <button onClick={handleToggleLike} className="text-[#fb7185] active:scale-90 transition-transform p-2 rounded-full bg-white shadow-sm border border-[#ffe4e6]">
+                    <Heart size={20} className={isLiked ? "fill-current" : ""} />
+                  </button>
                 </header>
 
-                {/* Konten Scroll */}
                 <main className="flex-1 overflow-y-auto pt-20 pb-28 hide-scrollbar">
                   <div className="relative w-full aspect-square bg-[#f9f1ff] flex items-center justify-center p-8">
                     {selectedProduk.gambar_url ? <img alt={selectedProduk.nama_produk} className="w-full h-full object-contain drop-shadow-xl" src={selectedProduk.gambar_url}/> : <PackageOpen size={80} className="text-[#ccc3d8]" />}
@@ -213,6 +207,8 @@ export default function PelangganBeranda() {
 
                       <div className="flex items-center justify-between mb-6 bg-[#f9f1ff] p-4 rounded-2xl border border-[#ffe4e6]">
                         <span className="text-sm font-black text-[#1d1a24]">Jumlah Beli</span>
+                        
+                        {/* TOMBOL PLUS MINUS JUMLAH */}
                         <div className="flex items-center gap-3 bg-white rounded-full p-1 border border-[#eaddff] shadow-sm">
                           <button onClick={() => setModalQty(Math.max(1, modalQty - 1))} className="w-8 h-8 flex items-center justify-center text-[#7b7487] active:scale-90"><Minus size={16} /></button>
                           <span className="text-sm font-black w-4 text-center">{modalQty}</span>
@@ -228,10 +224,13 @@ export default function PelangganBeranda() {
                   </div>
                 </main>
 
-                {/* Tombol Bawah Terkunci Kuat */}
                 <div className="absolute bottom-0 left-0 w-full bg-white px-6 pb-6 pt-4 border-t border-[#ffe4e6] z-50">
                   <div className="flex gap-3 items-center">
+                    
+                    {/* TOMBOL TANYA (WHATSAPP) */}
                     <button onClick={() => window.open(`https://wa.me/6287728450708?text=Halo Admin! Saya mau tanya soal *${selectedProduk.nama_produk}*.`, '_blank')} className="flex flex-col items-center text-[#7c3aed] bg-[#f9f1ff] border border-[#eaddff] rounded-2xl px-4 py-3 active:scale-95"><MessageCircle size={20} className="mb-1" /><span className="text-[10px] font-black">Tanya</span></button>
+                    
+                    {/* TOMBOL MASUK KERANJANG */}
                     <button onClick={handleBeliDariModal} className="flex-1 bg-[#630ed4] text-white font-black text-sm py-4 rounded-2xl shadow-[0_8px_20px_rgba(99,14,212,0.25)] active:scale-[0.98] flex justify-center gap-2"><ShoppingCart size={20} /> Masukkan Keranjang</button>
                   </div>
                 </div>
@@ -240,13 +239,13 @@ export default function PelangganBeranda() {
             </motion.div>
           )}
         </AnimatePresence>,
-        document.body // <- Teleportasi ke sini!
+        document.body 
       )}
 
       {/* ANIMASI TERBANG (TETAP AMAN) */}
       <AnimatePresence>
         {flyingItems.map((item) => (
-          <motion.div key={item.id} initial={{ left: item.x, top: item.y, opacity: 1, scale: 1 }} animate={{ left: "50%", top: "90vh", opacity: 0.2, scale: 0.3 }} exit={{ opacity: 0 }} transition={{ duration: 0.7 }} className="fixed w-10 h-10 bg-[#fb7185] rounded-full z-[9999] flex justify-center items-center pointer-events-none shadow-lg border-2 border-white"><Plus size={20} className="text-white" /></motion.div>
+          <motion.div key={item.id} initial={{ left: item.x, top: item.y, opacity: 1, scale: 1 }} animate={{ left: "50%", top: "90vh", opacity: 0.2, scale: 0.3 }} exit={{ opacity: 0 }} transition={{ duration: 0.7 }} className="fixed w-10 h-10 bg-[#fb7185] rounded-full z-[999999] flex justify-center items-center pointer-events-none shadow-lg border-2 border-white"><Plus size={20} className="text-white" /></motion.div>
         ))}
       </AnimatePresence>
 
