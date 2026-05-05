@@ -32,7 +32,7 @@ export default function PelangganBeranda() {
   const [flyingItems, setFlyingItems] = useState<{ id: number; x: number; y: number }[]>([]);
   
   const addToCart = useCartStore((state) => state.addToCart);
-  const cartItems = useCartStore((state) => state.items) || [];
+  const cartItems = useCartStore((state) => state.cart) || [];
   const cartCount = cartItems.reduce((total, item) => total + item.qty, 0);
 
   // ==========================================
