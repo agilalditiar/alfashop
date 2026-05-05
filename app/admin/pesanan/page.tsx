@@ -35,7 +35,7 @@ export default function PesananAdminPage() {
   // 3. Hitung & Filter Data
   const filteredPesanan = pesananList.filter((p) => {
     const matchStatus = filter === 'Semua' ? true : p.status === filter;
-    const matchSearch = p.nama_pelanggan.toLowerCase().includes(searchQuery.toLowerCase()) || p.id.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchSearch = p.nama_pelanggan.toLowerCase().includes(searchQuery.toLowerCase()) || p.id.toString().toLowerCase().includes(searchQuery.toLowerCase());
     return matchStatus && matchSearch;
   });
 
@@ -62,10 +62,11 @@ export default function PesananAdminPage() {
   };
 
   return (
-    <div className="flex flex-col h-full relative font-sans">
+    // Disesuaikan w-full dan paddingnya agar rata kiri dengan layout.tsx
+    <main className="flex-1 p-6 md:p-10 w-full flex flex-col font-sans">
       
-      {/* Header Section (Sticky) */}
-      <header className="sticky top-0 z-30 bg-[#fef7ff]/90 backdrop-blur-md border-b border-[#e8dfee] pb-4 mb-6 pt-2">
+      {/* Header Section (Toolbar Spesifik Pesanan) */}
+      <section className="relative bg-[#fef7ff]/90 border-b border-[#e8dfee] pb-4 mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-3xl font-bold text-[#1d1a24] tracking-tight">Pesanan Masuk</h2>
@@ -108,7 +109,7 @@ export default function PesananAdminPage() {
             </button>
           ))}
         </div>
-      </header>
+      </section>
 
       {/* Order Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
@@ -121,7 +122,7 @@ export default function PesananAdminPage() {
             <p className="text-sm font-bold text-[#7b7487]">Tidak ada pesanan di kategori ini.</p>
           </div>
         ) : filteredPesanan.map((order) => {
-          const shortId = `#ORD-${order.id.substring(0, 4).toUpperCase()}`;
+          const shortId = `#ORD-${order.id.toString().padStart(4, '0')}`;
           const dateObj = new Date(order.created_at);
           const timeString = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
           const dateString = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
@@ -159,7 +160,7 @@ export default function PesananAdminPage() {
               {/* Items List (Lumina Grey Box) */}
               <div className="bg-[#f3ebfa] rounded-lg p-4 flex flex-col gap-3 border border-[#e8dfee]">
                 <p className="text-[10px] font-black text-[#7b7487] uppercase tracking-wider mb-1">Detail Pesanan</p>
-                {order.item_pesanan.map((item: any, idx: number) => (
+                {order.item_pesanan?.map((item: any, idx: number) => (
                   <div key={idx} className="flex justify-between items-start text-sm font-medium text-[#1d1a24] gap-4">
                     <span className="leading-tight"><span className="font-black text-[#630ed4]">{item.quantity}x</span> {item.name}</span>
                     <span className="text-[#4a4455] shrink-0">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
@@ -176,7 +177,7 @@ export default function PesananAdminPage() {
 
                 <div className="flex gap-3">
                   <a 
-                    href={`https://wa.me/62${order.whatsapp.replace(/^0/, '')}?text=Halo%20${order.nama_pelanggan},%20pesanan%20${shortId}%20sedang%20kami%20proses.`}
+                    href={`https://wa.me/62${order.whatsapp?.replace(/^0/, '')}?text=Halo%20${order.nama_pelanggan},%20pesanan%20${shortId}%20sedang%20kami%20proses.`}
                     target="_blank" rel="noreferrer"
                     className="flex-1 bg-[#f9f1ff] hover:bg-[#e8dfee] text-[#1d1a24] text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors border border-[#e8dfee]"
                   >
@@ -197,6 +198,6 @@ export default function PesananAdminPage() {
           );
         })}
       </div>
-    </div>
+    </main>
   );
 }
