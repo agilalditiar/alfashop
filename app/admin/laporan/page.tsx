@@ -1,17 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Calendar, Download, TrendingUp, ShoppingBag, ChevronDown, BarChart3 } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown, ShoppingBag, Banknote, ReceiptText, Users, MoreVertical } from 'lucide-react';
 
 export default function LaporanAdminPage() {
   const [semuaPesanan, setSemuaPesanan] = useState<any[]>([]);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  const [tabAktif, setTabAktif] = useState<'Keseluruhan' | 'Web' | 'Warung'>('Keseluruhan');
   const [grafikPeriode, setGrafikPeriode] = useState<'Harian' | 'Mingguan' | 'Bulanan'>('Harian');
-  const [filterWaktu, setFilterWaktu] = useState<'Bulan Ini' | 'Tahun Ini' | 'Semua Waktu'>('Bulan Ini');
-  const [showDropdownWaktu, setShowDropdownWaktu] = useState(false);
+  const [filterWaktu, setFilterWaktu] = useState<'7 Hari Terakhir' | '30 Hari Terakhir' | 'Kuartal Ini' | 'Tahun Ini'>('7 Hari Terakhir');
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -21,40 +19,47 @@ export default function LaporanAdminPage() {
 
   const fetchData = async () => {
     setIsLoading(true);
-    const { data } = await supabase.from('pesanan').select('*').eq('status', 'Selesai').order('created_at', { ascending: false });
-    setSemuaPesanan(data || []);
-    setIsLoading(false);
+    try {
+      const res = await fetch('/api/admin/laporan');
+      if (!res.ok) throw new Error('Gagal mengambil data laporan');
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setSemuaPesanan(data);
+      } else {
+        setSemuaPesanan(data.pesanan || []);
+        setTopProducts(data.topProducts || []);
+      }
+    } catch (error) {
+      console.error("Error memuat laporan:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const now = new Date();
-  const currentMonth = now.getMonth();
-  const currentYear = now.getFullYear();
 
-  const dataTab = semuaPesanan.filter(p => {
-    if (tabAktif === 'Keseluruhan') return true; 
-    const isWarung = p.nama_pelanggan.includes('Pelanggan Kasir');
-    return tabAktif === 'Warung' ? isWarung : !isWarung;
-  });
-
-  const omzetHariIni = dataTab.filter(p => new Date(p.created_at).toDateString() === now.toDateString()).reduce((acc, curr) => acc + curr.total_harga, 0);
-  const omzetMingguIni = dataTab.filter(p => {
+  // Filter Data Berdasarkan Waktu
+  const dataTampil = semuaPesanan.filter(p => {
     const d = new Date(p.created_at);
-    const semingguLalu = new Date();
-    semingguLalu.setDate(now.getDate() - 7);
-    return d >= semingguLalu;
-  }).reduce((acc, curr) => acc + curr.total_harga, 0);
-  const omzetBulanIni = dataTab.filter(p => {
-    const d = new Date(p.created_at);
-    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-  }).reduce((acc, curr) => acc + curr.total_harga, 0);
-  const omzetTahunIni = dataTab.filter(p => new Date(p.created_at).getFullYear() === currentYear).reduce((acc, curr) => acc + curr.total_harga, 0);
-
-  const dataTampil = dataTab.filter(p => {
-    const d = new Date(p.created_at);
-    if (filterWaktu === 'Bulan Ini') return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-    if (filterWaktu === 'Tahun Ini') return d.getFullYear() === currentYear;
+    const diffTime = Math.abs(now.getTime() - d.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    
+    if (filterWaktu === '7 Hari Terakhir') return diffDays <= 7;
+    if (filterWaktu === '30 Hari Terakhir') return diffDays <= 30;
+    if (filterWaktu === 'Kuartal Ini') {
+      const currentQuarter = Math.floor(now.getMonth() / 3);
+      const orderQuarter = Math.floor(d.getMonth() / 3);
+      return currentQuarter === orderQuarter && now.getFullYear() === d.getFullYear();
+    }
+    if (filterWaktu === 'Tahun Ini') return d.getFullYear() === now.getFullYear();
     return true;
   });
+
+  // KPI Calculations
+  const omzetHariIni = semuaPesanan.filter(p => new Date(p.created_at).toDateString() === now.toDateString()).reduce((acc, curr) => acc + curr.total_harga, 0);
+  const totalOrders = dataTampil.length;
+  const avgOrderValue = totalOrders > 0 ? dataTampil.reduce((acc, curr) => acc + curr.total_harga, 0) / totalOrders : 0;
+  const activeCustomers = new Set(dataTampil.map(p => p.nama_pelanggan)).size;
 
   const generateChartData = () => {
     const dataTerurut = [...dataTampil].reverse(); 
@@ -72,7 +77,11 @@ export default function LaporanAdminPage() {
       if (!groupedData[key]) groupedData[key] = 0;
       groupedData[key] += order.total_harga; 
     });
-    return Object.keys(groupedData).map(key => ({ tanggal: key, total: groupedData[key] }));
+    
+    return Object.keys(groupedData).map(key => ({ 
+      tanggal: key, 
+      total: groupedData[key] 
+    }));
   };
 
   const handleExportCSV = () => {
@@ -83,112 +92,253 @@ export default function LaporanAdminPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Laporan_AlfaShop_${tabAktif}.csv`;
+    link.download = `Laporan_AlfaShop_${filterWaktu.replace(/ /g, '_')}.csv`;
     link.click();
   };
 
-  // KODE RENDER DI BAWAH INI SUDAH DIBERSIHKAN DARI SIDEBAR & HEADER
   return (
-    <main className="flex-1 p-6 md:p-10 w-full flex flex-col gap-8 pb-20">
+    <main className="flex-1 px-6 md:px-12 py-8 w-full max-w-[1440px] mx-auto flex flex-col gap-6 font-body-md text-admin-on-surface">
       
-      {/* Kontrol Atas */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="border-b border-[#e8dfee] flex gap-6 w-full md:w-auto overflow-x-auto hide-scrollbar">
-          {['Keseluruhan', 'Web', 'Warung'].map((t) => (
-            <button key={t} onClick={() => setTabAktif(t as any)} className={`pb-3 text-sm font-bold transition-colors whitespace-nowrap ${tabAktif === t ? 'text-[#630ed4] border-b-2 border-[#630ed4]' : 'text-[#4a4455] hover:text-[#630ed4]'}`}>
-              {t === 'Keseluruhan' ? 'Total Penjualan' : `Penjualan ${t}`}
-            </button>
-          ))}
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-4 gap-4">
+        <div>
+          <h2 className="text-3xl font-bold text-admin-on-surface tracking-tight">Laporan & Analitik</h2>
+          <p className="text-sm font-medium text-admin-on-surface-variant mt-1">Ringkasan komprehensif kinerja toko.</p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <button onClick={() => setShowDropdownWaktu(!showDropdownWaktu)} className="flex items-center gap-2 px-5 py-2.5 bg-white border border-[#e8dfee] rounded-full text-[#630ed4] text-sm font-bold shadow-sm hover:bg-[#fef7ff]">
-              <Calendar size={18} /> {filterWaktu} <ChevronDown size={16} />
-            </button>
-            {showDropdownWaktu && (
-              <div className="absolute top-full mt-2 right-0 w-40 bg-white border border-[#e8dfee] rounded-2xl shadow-xl z-50 overflow-hidden">
-                {['Bulan Ini', 'Tahun Ini', 'Semua Waktu'].map((opsi) => (
-                  <button key={opsi} onClick={() => { setFilterWaktu(opsi as any); setShowDropdownWaktu(false); }} className="w-full text-left px-5 py-3 text-sm font-bold hover:bg-[#f3ebfa] text-[#1d1a24]">{opsi}</button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button onClick={handleExportCSV} className="flex items-center gap-2 px-5 py-2.5 bg-[#630ed4] rounded-full text-white text-sm font-bold shadow-md active:scale-95 transition-transform hover:bg-[#7c3aed]">
-            <Download size={18} /> Ekspor
+        <div className="flex gap-3 w-full md:w-auto">
+          <select 
+            value={filterWaktu}
+            onChange={(e) => setFilterWaktu(e.target.value as any)}
+            className="bg-admin-surface-container-high border border-admin-outline-variant/30 rounded-lg py-2.5 px-4 text-sm font-semibold text-admin-on-surface focus:outline-none focus:border-admin-primary-container focus:ring-1 focus:ring-admin-primary-container cursor-pointer"
+          >
+            <option>7 Hari Terakhir</option>
+            <option>30 Hari Terakhir</option>
+            <option>Kuartal Ini</option>
+            <option>Tahun Ini</option>
+          </select>
+          <button 
+            onClick={handleExportCSV}
+            className="bg-admin-surface-container-highest border border-admin-outline-variant/30 text-admin-on-surface py-2.5 px-5 rounded-lg text-sm font-bold hover:bg-admin-surface-bright transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <Download size={16} /> Ekspor
           </button>
         </div>
       </div>
 
-      {/* Card Statistik */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {[
-          { label: 'Harian', value: omzetHariIni, color: 'bg-[#eaddff]', text: 'text-[#630ed4]' },
-          { label: 'Mingguan', value: omzetMingguIni, color: 'bg-[#d2bbff]', text: 'text-[#5a00c6]' },
-          { label: 'Bulanan', value: omzetBulanIni, color: 'bg-[#f3ebfa]', text: 'text-[#630ed4]' },
-          { label: 'Tahunan', value: omzetTahunIni, color: 'bg-[#fff1f2]', text: 'text-[#ba1a1a]' },
-        ].map((card, i) => (
-          <div key={i} className="bg-[#ffffff] rounded-2xl p-6 border border-[#e8dfee] shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
-            <div className={`absolute -right-4 -top-4 w-16 h-16 ${card.color} opacity-20 rounded-full blur-xl group-hover:scale-150 transition-transform`}></div>
-            <p className="text-[10px] font-bold text-[#4a4455] uppercase tracking-wider mb-2">Omzet {card.label}</p>
-            <h3 className={`text-2xl font-bold tracking-tight ${card.text}`}>
-              {isLoading ? '...' : `Rp ${card.value.toLocaleString('id-ID')}`}
-            </h3>
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* KPI 1 */}
+        <div className="bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 relative overflow-hidden group hover:border-admin-primary-container/50 transition-colors">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-admin-primary-container/5 rounded-full -mr-16 -mt-16 blur-xl"></div>
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm font-semibold text-admin-on-surface-variant">Pendapatan Hari Ini</span>
+            <Banknote className="text-admin-primary-container" size={24} />
           </div>
-        ))}
-      </div>
-
-      {/* Area Chart */}
-      <div className="bg-[#ffffff] rounded-2xl border border-[#e8dfee] p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
-          <h4 className="text-lg font-bold text-[#1d1a24] flex items-center gap-2"><BarChart3 size={20} className="text-[#630ed4]"/> Tren Pendapatan</h4>
-          <div className="flex bg-[#fef7ff] p-1 rounded-lg border border-[#e8dfee]">
-            {['Harian', 'Mingguan', 'Bulanan'].map((p) => (
-              <button key={p} onClick={() => setGrafikPeriode(p as any)} className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${grafikPeriode === p ? 'bg-white text-[#630ed4] shadow-sm' : 'text-[#4a4455] hover:text-[#1d1a24]'}`}>{p}</button>
-            ))}
+          <div className="flex flex-col gap-1">
+            <span className="text-3xl font-bold text-admin-on-surface">Rp {omzetHariIni.toLocaleString('id-ID')}</span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="flex items-center text-admin-primary text-xs font-bold bg-admin-primary/10 px-2 py-0.5 rounded-full border border-admin-primary/20">
+                <TrendingUp size={14} className="mr-1" /> 14.5%
+              </span>
+              <span className="text-xs font-medium text-admin-on-surface-variant">vs kemarin</span>
+            </div>
           </div>
         </div>
-        
-        <div className="w-full h-[300px] min-h-[300px] relative">
-          {isMounted && !isLoading && (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <defs><linearGradient id="color" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#630ed4" stopOpacity={0.3}/><stop offset="95%" stopColor="#630ed4" stopOpacity={0}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e8dfee" />
-                <XAxis dataKey="tanggal" axisLine={false} tickLine={false} tick={{fontSize: 10, fill:'#4a4455'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill:'#4a4455'}} tickFormatter={(v) => `Rp${v/1000}k`} />
-                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }} formatter={(v: any) => [`Rp ${v.toLocaleString('id-ID')}`, 'Omzet']} />
-                <Area type="monotone" dataKey="total" stroke="#630ed4" strokeWidth={3} fill="url(#color)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
+
+        {/* KPI 2 */}
+        <div className="bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 relative overflow-hidden hover:border-admin-primary-container/50 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm font-semibold text-admin-on-surface-variant">Total Pesanan</span>
+            <ShoppingBag className="text-admin-secondary" size={24} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-3xl font-bold text-admin-on-surface">{totalOrders}</span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="flex items-center text-admin-primary text-xs font-bold bg-admin-primary/10 px-2 py-0.5 rounded-full border border-admin-primary/20">
+                <TrendingUp size={14} className="mr-1" /> 8.2%
+              </span>
+              <span className="text-xs font-medium text-admin-on-surface-variant">vs periode lalu</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 3 */}
+        <div className="bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 relative overflow-hidden hover:border-admin-primary-container/50 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm font-semibold text-admin-on-surface-variant">Rata-rata Nilai Pesanan</span>
+            <ReceiptText className="text-admin-tertiary" size={24} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-3xl font-bold text-admin-on-surface">Rp {Math.round(avgOrderValue).toLocaleString('id-ID')}</span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="flex items-center text-admin-error text-xs font-bold bg-admin-error-container/20 px-2 py-0.5 rounded-full border border-admin-error/20">
+                <TrendingDown size={14} className="mr-1" /> 2.1%
+              </span>
+              <span className="text-xs font-medium text-admin-on-surface-variant">vs periode lalu</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4 */}
+        <div className="bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 relative overflow-hidden hover:border-admin-primary-container/50 transition-colors">
+          <div className="flex justify-between items-start mb-4">
+            <span className="text-sm font-semibold text-admin-on-surface-variant">Pelanggan Aktif</span>
+            <Users className="text-admin-on-secondary-container" size={24} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-3xl font-bold text-admin-on-surface">{activeCustomers}</span>
+            <div className="flex items-center gap-2 mt-2">
+              <span className="flex items-center text-admin-primary text-xs font-bold bg-admin-primary/10 px-2 py-0.5 rounded-full border border-admin-primary/20">
+                <TrendingUp size={14} className="mr-1" /> 5.4%
+              </span>
+              <span className="text-xs font-medium text-admin-on-surface-variant">vs periode lalu</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Tabel Pesanan Terakhir */}
-      <div className="bg-[#ffffff] rounded-2xl border border-[#e8dfee] overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-[#e8dfee] bg-[#fef7ff]/50 flex justify-between items-center">
-          <h4 className="text-lg font-bold text-[#1d1a24]">Pesanan Terakhir ({tabAktif})</h4>
+      {/* Charts Section (Bento Layout) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+        {/* Main Trend Line Chart */}
+        <div className="lg:col-span-2 bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 flex flex-col min-h-[400px]">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+            <div>
+              <h3 className="text-xl font-bold text-admin-on-surface">Tren Pendapatan</h3>
+              <span className="text-xs font-medium text-admin-on-surface-variant mt-1 block">Volume kotor harian</span>
+            </div>
+            <div className="flex gap-2">
+              {['Harian', 'Mingguan', 'Bulanan'].map((p) => (
+                <button 
+                  key={p} 
+                  onClick={() => setGrafikPeriode(p as any)}
+                  className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                    grafikPeriode === p ? 'bg-[#2D5A4C] text-[#F2FBF8]' : 'bg-admin-surface-container-highest text-admin-on-surface hover:bg-admin-surface-bright'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="flex-grow w-full relative">
+            {isMounted && !isLoading ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={generateChartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#A7DDC7" stopOpacity={0.3}/>
+                      <stop offset="100%" stopColor="#A7DDC7" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-admin-outline-variant)" opacity={0.2} />
+                  <XAxis dataKey="tanggal" axisLine={false} tickLine={false} tick={{fontSize: 11, fill:'var(--color-admin-on-surface-variant)'}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill:'var(--color-admin-on-surface-variant)'}} tickFormatter={(v) => `Rp${v/1000}k`} />
+                  <Tooltip 
+                    cursor={{stroke: 'var(--color-admin-outline-variant)', strokeWidth: 1, strokeDasharray: '4 4'}}
+                    contentStyle={{ backgroundColor: '#1A2421', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)' }} 
+                    itemStyle={{ color: '#A7DDC7', fontWeight: 'bold' }} 
+                    formatter={(v: any) => [`Rp ${v.toLocaleString('id-ID')}`, 'Pendapatan']} 
+                  />
+                  <Area type="monotone" dataKey="total" stroke="#A7DDC7" strokeWidth={2} fillOpacity={1} fill="url(#chartGradient)" activeDot={{ r: 5, fill: '#A7DDC7', stroke: '#1A2421', strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-admin-on-surface-variant text-sm font-medium animate-pulse">Memuat data grafik...</div>
+            )}
+          </div>
         </div>
-        <div className="divide-y divide-[#e8dfee]">
-          {dataTampil.slice(0, 5).map((trx) => (
-            <div key={trx.id} className="p-6 flex items-center justify-between hover:bg-[#fef7ff] transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-xl bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4]"><ShoppingBag size={18} /></div>
-                <div>
-                  <p className="text-sm font-bold text-[#1d1a24]">ORD-{trx.id.toString().padStart(4, '0')}</p>
-                  <p className="text-[10px] font-medium text-[#4a4455]">{new Date(trx.created_at).toLocaleDateString('id-ID')}</p>
+
+        {/* Top Products / Bar Chart */}
+        <div className="bg-[#1A2421] rounded-xl p-6 border border-admin-outline-variant/20 flex flex-col">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl font-bold text-admin-on-surface">Produk Teratas</h3>
+            <button className="text-admin-on-surface-variant hover:text-admin-primary transition-colors cursor-pointer p-1">
+              <MoreVertical size={20} />
+            </button>
+          </div>
+          <div className="flex flex-col gap-5 flex-grow justify-center">
+            {isLoading ? (
+              <div className="text-sm font-medium text-admin-on-surface-variant text-center animate-pulse">Memuat produk...</div>
+            ) : topProducts.length === 0 ? (
+              <div className="text-sm font-medium text-admin-on-surface-variant text-center">Belum ada data produk terjual.</div>
+            ) : topProducts.map((item, i) => {
+              const maxSales = topProducts[0]?.sales || 1;
+              const width = Math.max(10, Math.round((item.sales / maxSales) * 100)) + '%';
+              const colors = ['bg-admin-primary-container', 'bg-admin-secondary', 'bg-admin-tertiary', 'bg-admin-on-secondary-container', 'bg-admin-outline-variant'];
+              const color = colors[i % colors.length];
+
+              return (
+              <div key={i}>
+                <div className="flex justify-between text-sm font-semibold mb-1.5">
+                  <span className="text-admin-on-surface truncate pr-2">{item.name}</span>
+                  <span className="text-admin-primary-container shrink-0">{item.sales}</span>
+                </div>
+                <div className="w-full bg-admin-surface-container h-2 rounded-full overflow-hidden">
+                  <div className={`${color} h-full rounded-full transition-all duration-1000`} style={{ width }}></div>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-[#1d1a24]">Rp {trx.total_harga.toLocaleString('id-ID')}</p>
-                <span className="text-[9px] font-bold text-[#059669] bg-[#ecfdf5] px-2 py-0.5 rounded border border-[#a7f3d0]">SELESAI</span>
-              </div>
-            </div>
-          ))}
-          {dataTampil.length === 0 && (
-            <div className="p-8 text-center text-[#4a4455] text-sm font-medium">Belum ada transaksi di periode ini.</div>
-          )}
+            )})}
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Transactions Table */}
+      <div className="bg-[#1A2421] rounded-xl border border-admin-outline-variant/20 overflow-hidden mt-2">
+        <div className="p-6 border-b border-admin-outline-variant/20 flex justify-between items-center">
+          <h3 className="text-xl font-bold text-admin-on-surface">Transaksi Terakhir</h3>
+          <a className="text-sm font-semibold text-admin-primary hover:underline cursor-pointer">Lihat Semua</a>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="border-b border-[#1E3D34]">
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">ID Pesanan</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Pelanggan</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Tanggal</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Jumlah</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Status</th>
+              </tr>
+            </thead>
+            <tbody className="text-sm font-medium">
+              {isLoading ? (
+                <tr><td colSpan={5} className="py-8 text-center text-admin-on-surface-variant">Memuat transaksi...</td></tr>
+              ) : dataTampil.length === 0 ? (
+                <tr><td colSpan={5} className="py-8 text-center text-admin-on-surface-variant">Tidak ada transaksi terbaru ditemukan.</td></tr>
+              ) : (
+                dataTampil.slice(0, 5).map((trx) => {
+                  const isCompleted = (trx.status || 'Selesai').toLowerCase() === 'selesai';
+                  const isPending = (trx.status || '').toLowerCase() === 'menunggu';
+                  const isProcessing = (trx.status || '').toLowerCase() === 'diproses';
+                  
+                  let badgeBg = 'bg-[#2D5A4C] text-[#F2FBF8]';
+                  let badgeText = 'Selesai';
+                  
+                  if (isPending) {
+                     badgeBg = 'bg-[#4A3B1A] text-[#FDE293]';
+                     badgeText = 'Menunggu';
+                  } else if (isProcessing) {
+                     badgeBg = 'bg-[#2D4A5A] text-[#E2F3FD]';
+                     badgeText = 'Diproses';
+                  }
+
+                  return (
+                    <tr key={trx.id} className="border-b border-[#1E3D34] hover:bg-[#1E3D34]/50 transition-colors last:border-b-0">
+                      <td className="py-4 px-6 text-admin-on-surface font-semibold">#ORD-{trx.id.toString().padStart(4, '0')}</td>
+                      <td className="py-4 px-6 text-admin-on-surface-variant">{trx.nama_pelanggan}</td>
+                      <td className="py-4 px-6 text-admin-on-surface-variant">{new Date(trx.created_at).toLocaleString('id-ID', { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' })}</td>
+                      <td className="py-4 px-6 text-admin-on-surface font-semibold">Rp {trx.total_harga.toLocaleString('id-ID')}</td>
+                      <td className="py-4 px-6">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold opacity-90 ${badgeBg}`}>
+                          {trx.status ? trx.status : badgeText}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

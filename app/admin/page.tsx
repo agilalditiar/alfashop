@@ -1,8 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
-import { Package, ShoppingBag, ShoppingCart, BarChart3, Store, Banknote, Power } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const [isOpen, setIsOpen] = useState(true);
@@ -14,122 +12,146 @@ export default function AdminDashboardPage() {
     fetchDashboardData();
   }, []);
 
+  // FRONTEND: Meminta data ke Backend API
   const fetchDashboardData = async () => {
     setIsLoading(true);
-    const hariIni = new Date();
-    hariIni.setHours(0, 0, 0, 0);
-    const besok = new Date(hariIni);
-    besok.setDate(besok.getDate() + 1);
-
-    const [
-      { data: pengaturan },
-      { data: pesananSelesai },
-      { count: jumlahMenunggu }
-    ] = await Promise.all([
-      supabase.from('pengaturan').select('is_open').eq('id', 1).single(),
-      supabase.from('pesanan').select('total_harga').eq('status', 'Selesai').gte('created_at', hariIni.toISOString()).lt('created_at', besok.toISOString()),
-      supabase.from('pesanan').select('*', { count: 'exact', head: true }).eq('status', 'Menunggu')
-    ]);
-
-    if (pengaturan) setIsOpen(pengaturan.is_open);
-    if (pesananSelesai) setOmzetHariIni(pesananSelesai.reduce((acc, curr) => acc + curr.total_harga, 0));
-    if (jumlahMenunggu !== null) setPesananBaru(jumlahMenunggu);
-    setIsLoading(false);
+    try {
+      const res = await fetch('/api/admin/dashboard');
+      const data = await res.json();
+      
+      setIsOpen(data.isOpen);
+      setOmzetHariIni(data.omzet);
+      setPesananBaru(data.pesananBaru);
+    } catch (error) {
+      console.error("Gagal mengambil data dashboard:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  // FRONTEND: Mengirim perintah buka/tutup toko ke Backend API
   const handleToggleToko = async () => {
     const statusBaru = !isOpen;
-    setIsOpen(statusBaru); 
-    await supabase.from('pengaturan').update({ is_open: statusBaru }).eq('id', 1);
+    setIsOpen(statusBaru); // Ubah UI langsung biar terasa cepat (Optimistic UI)
+    
+    try {
+      await fetch('/api/admin/dashboard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_open: statusBaru })
+      });
+    } catch (error) {
+      console.error("Gagal update status toko:", error);
+      setIsOpen(!statusBaru); // Kembalikan seperti semula kalau error
+    }
   };
 
   return (
-    <main className="p-6 md:p-10 flex flex-col gap-8 w-full">
-      
-      {/* Greeting & Hero Widget */}
-      <section className="flex flex-col gap-6">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-3xl font-bold text-[#1d1a24]">Halo, Admin! 👋</h2>
-          <p className="text-base text-[#4a4455]">Berikut adalah ringkasan performa toko Anda hari ini.</p>
-        </div>
+    <main className="flex-1 p-6 md:p-10 max-w-7xl mx-auto w-full flex flex-col gap-10">
+      {/* Greeting */}
+      <section className="flex flex-col gap-2">
+        <h2 className="text-[28px] font-bold text-admin-on-surface tracking-tight">Halo, Admin!</h2>
+        <p className="font-body-md text-admin-on-surface-variant">Berikut adalah ringkasan performa toko Anda hari ini.</p>
+      </section>
 
-        <div className={`rounded-2xl p-8 md:p-10 shadow-sm border relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6 min-h-[160px] transition-all duration-500 ${isOpen ? 'bg-[#630ed4]/5 border-[#630ed4]/10' : 'bg-[#ba1a1a]/5 border-[#ba1a1a]/10'}`}>
-          <div className={`absolute -right-20 -top-20 w-64 h-64 rounded-full blur-3xl pointer-events-none transition-colors duration-500 ${isOpen ? 'bg-[#630ed4]/10' : 'bg-[#ba1a1a]/10'}`}></div>
-          
-          <div className="flex flex-col gap-2 z-10 text-center md:text-left">
-            <div className="flex items-center gap-3 justify-center md:justify-start">
-              <span className={`w-3 h-3 rounded-full transition-colors duration-500 shadow-[0_0_12px_rgba(0,0,0,0.5)] ${isOpen ? 'bg-[#630ed4] shadow-[#630ed4]/50' : 'bg-[#ba1a1a] shadow-[#ba1a1a]/50'}`}></span>
-              <h3 className={`text-2xl font-bold transition-colors duration-500 ${isOpen ? 'text-[#630ed4]' : 'text-[#ba1a1a]'}`}>
+      {/* Store Status Widget */}
+      <section>
+        <div className="relative overflow-hidden bg-admin-secondary-container rounded-[32px] p-8 md:p-10 border border-admin-outline-variant/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-8">
+          {/* Background blobs */}
+          <div className="absolute -right-10 -top-10 w-64 h-64 bg-admin-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-admin-tertiary/10 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div className="relative z-10 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <span className={`w-2.5 h-2.5 rounded-full ${isOpen ? 'bg-admin-primary animate-pulse shadow-[0_0_8px_rgba(195,250,227,0.6)]' : 'bg-admin-error animate-pulse shadow-[0_0_8px_rgba(255,180,171,0.6)]'}`}></span>
+              <h3 className={`font-label-md uppercase tracking-widest text-sm ${isOpen ? 'text-admin-primary' : 'text-admin-error'}`}>
                 {isLoading ? 'Mengecek Status...' : (isOpen ? 'Toko Buka' : 'Toko Tutup')}
               </h3>
             </div>
-            <p className="text-[16px] text-[#4a4455] max-w-md">
-              {isOpen ? 'Pelanggan bisa memesan dan melihat katalog produk Anda secara online.' : 'Fitur pesanan online sedang dimatikan sementara.'}
+            <p className="font-body-lg text-admin-on-secondary-container max-w-[32rem] leading-relaxed">
+              {isOpen ? 'Pelanggan bisa memesan dan melihat katalog produk Anda secara langsung dari aplikasi atau website.' : 'Toko sedang tutup. Pelanggan tidak bisa memesan secara online untuk sementara waktu.'}
             </p>
           </div>
 
-          <div className="z-10 flex-shrink-0 cursor-pointer group" onClick={handleToggleToko}>
-            <div className={`w-32 h-14 rounded-full p-1.5 flex items-center shadow-inner transition-all duration-500 ${isOpen ? 'bg-[#630ed4]' : 'bg-[#ba1a1a]'}`}>
-              <div className={`w-11 h-11 bg-[#ffffff] rounded-full shadow-md flex items-center justify-center transform transition-transform duration-500 group-hover:scale-95 ${isOpen ? 'translate-x-16' : 'translate-x-0'}`}>
-                <Power size={24} className={`transition-colors duration-500 ${isOpen ? 'text-[#630ed4]' : 'text-[#ba1a1a]'}`} />
+          {/* Modern Toggle Switch */}
+          <div className="relative z-10 flex-shrink-0 cursor-pointer group" onClick={handleToggleToko}>
+            <div className={`w-[110px] h-[54px] rounded-full p-1.5 flex items-center transition-all duration-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] ${isOpen ? 'bg-admin-primary' : 'bg-admin-surface-container-highest'}`}>
+              <div className={`w-11 h-11 rounded-full shadow-lg flex items-center justify-center transform transition-transform duration-500 ease-out group-hover:scale-105 ${isOpen ? 'bg-admin-on-primary translate-x-12' : 'bg-admin-on-surface-variant translate-x-0'}`}>
+                <span className={`material-symbols-outlined text-[24px] ${isOpen ? 'text-admin-primary' : 'text-admin-surface-container-highest'}`}>storefront</span>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Middle Section: Stats Cards */}
+      {/* Key Stats */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-[#ffffff] rounded-2xl p-6 shadow-sm border border-[#e8dfee] flex flex-col gap-4 hover:shadow-md transition-shadow duration-300">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#4a4455] uppercase tracking-wider">Omzet Hari Ini</span>
-            <div className="w-12 h-12 rounded-full bg-[#059669]/10 flex items-center justify-center text-[#059669]">
-              <Banknote size={24} />
+        {/* Omzet */}
+        <div className="bg-admin-surface-container-low rounded-[24px] p-8 border border-admin-outline-variant/30 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex flex-col gap-4">
+            <span className="font-label-md text-admin-on-surface-variant uppercase tracking-wider text-[12px]">Omzet Hari Ini</span>
+            <div className="flex flex-col">
+              <span className="font-display-lg text-admin-on-surface text-3xl md:text-4xl">
+                {isLoading ? '...' : `Rp ${omzetHariIni.toLocaleString('id-ID')}`}
+              </span>
+              <div className="mt-2 inline-flex items-center gap-1.5 text-admin-primary font-bold bg-admin-primary/10 px-3 py-1 rounded-full text-sm w-fit">
+                <span className="material-symbols-outlined text-[18px]">trending_up</span>
+                Real-time
+              </div>
             </div>
           </div>
-          <div className="flex items-baseline gap-3 min-h-[48px]">
-            {isLoading ? <span className="text-4xl font-bold text-[#ccc3d8] animate-pulse">...</span> : <span className="text-5xl font-bold text-[#1d1a24] tracking-tight">Rp {omzetHariIni.toLocaleString('id-ID')}</span>}
-            <span className="text-[14px] font-semibold text-[#ffffff] bg-[#630ed4] px-3 py-1 rounded-lg shadow-sm">Real-time</span>
+          <div className="w-16 h-16 rounded-2xl bg-admin-tertiary/20 flex items-center justify-center text-admin-tertiary">
+            <span className="material-symbols-outlined text-[32px] icon-fill">payments</span>
           </div>
         </div>
 
-        <div className="bg-[#ffffff] rounded-2xl p-6 shadow-sm border border-[#e8dfee] flex flex-col gap-4 hover:shadow-md transition-shadow duration-300">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#4a4455] uppercase tracking-wider">Pesanan Baru</span>
-            <div className="w-12 h-12 rounded-full bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4]">
-              <ShoppingBag size={24} />
+        {/* Orders */}
+        <div className="bg-admin-surface-container-low rounded-[24px] p-8 border border-admin-outline-variant/30 flex items-center justify-between shadow-sm hover:shadow-md transition-shadow">
+          <div className="flex flex-col gap-4">
+            <span className="font-label-md text-admin-on-surface-variant uppercase tracking-wider text-[12px]">Pesanan Baru</span>
+            <div className="flex flex-col">
+              <span className="font-display-lg text-admin-on-surface text-3xl md:text-4xl">
+                {isLoading ? '...' : pesananBaru}
+              </span>
+              <span className="mt-2 text-admin-on-surface-variant font-medium text-sm">Menunggu diproses oleh tim</span>
             </div>
           </div>
-          <div className="flex items-baseline gap-3 min-h-[48px]">
-            {isLoading ? <span className="text-5xl font-bold text-[#ccc3d8] animate-pulse">...</span> : <span className="text-5xl font-bold text-[#1d1a24] tracking-tight">{pesananBaru}</span>}
-            <span className="text-base text-[#4a4455]">Menunggu proses</span>
+          <div className="w-16 h-16 rounded-2xl bg-admin-primary/20 flex items-center justify-center text-admin-primary">
+            <span className="material-symbols-outlined text-[32px] icon-fill">shopping_bag</span>
           </div>
         </div>
       </section>
 
-      {/* Bottom Section: Quick Actions */}
-      <section className="flex flex-col gap-4">
-        <h3 className="text-2xl font-bold text-[#1d1a24] mb-2">Aksi Cepat</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-          <Link href="/admin/kasir" className="bg-[#f9f1ff] rounded-2xl p-8 flex flex-col items-center justify-center gap-6 hover:bg-[#630ed4]/5 transition-all duration-300 border border-transparent hover:border-[#630ed4]/20 shadow-sm hover:shadow-md group">
-            <div className="w-16 h-16 rounded-full bg-[#ffffff] group-hover:bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4] transition-colors duration-300 shadow-sm group-hover:shadow-none"><ShoppingCart size={32} /></div>
-            <span className="text-[14px] font-semibold text-center text-[#1d1a24] group-hover:text-[#630ed4]">Kasir Offline</span>
+      {/* Quick Actions */}
+      <section className="flex flex-col gap-6">
+        <h3 className="font-headline-md text-admin-on-surface">Aksi Cepat</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+          <Link href="/admin/kasir" className="group bg-admin-surface-container-low hover:bg-admin-surface-container-high hover:shadow-xl hover:shadow-admin-primary/5 transition-all duration-300 rounded-[24px] p-8 flex flex-col items-center gap-5 border border-admin-outline-variant/30 hover:border-admin-primary/30">
+            <div className="w-16 h-16 rounded-2xl bg-admin-surface-container-highest group-hover:bg-admin-primary transition-colors duration-300 flex items-center justify-center text-admin-primary group-hover:text-admin-on-primary shadow-sm">
+              <span className="material-symbols-outlined text-[32px]">point_of_sale</span>
+            </div>
+            <span className="font-label-md text-admin-on-surface group-hover:text-admin-primary transition-colors">Kasir Offline</span>
           </Link>
-          <Link href="/admin/produk" className="bg-[#f9f1ff] rounded-2xl p-8 flex flex-col items-center justify-center gap-6 hover:bg-[#630ed4]/5 transition-all duration-300 border border-transparent hover:border-[#630ed4]/20 shadow-sm hover:shadow-md group">
-            <div className="w-16 h-16 rounded-full bg-[#ffffff] group-hover:bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4] transition-colors duration-300 shadow-sm group-hover:shadow-none"><Package size={32} /></div>
-            <span className="text-[14px] font-semibold text-center text-[#1d1a24] group-hover:text-[#630ed4]">Kelola Produk</span>
+          <Link href="/admin/produk" className="group bg-admin-surface-container-low hover:bg-admin-surface-container-high hover:shadow-xl hover:shadow-admin-primary/5 transition-all duration-300 rounded-[24px] p-8 flex flex-col items-center gap-5 border border-admin-outline-variant/30 hover:border-admin-primary/30">
+            <div className="w-16 h-16 rounded-2xl bg-admin-surface-container-highest group-hover:bg-admin-primary transition-colors duration-300 flex items-center justify-center text-admin-primary group-hover:text-admin-on-primary shadow-sm">
+              <span className="material-symbols-outlined text-[32px]">inventory_2</span>
+            </div>
+            <span className="font-label-md text-admin-on-surface group-hover:text-admin-primary transition-colors">Kelola Produk</span>
           </Link>
-          <Link href="/admin/pesanan" className="bg-[#f9f1ff] rounded-2xl p-8 flex flex-col items-center justify-center gap-6 hover:bg-[#630ed4]/5 transition-all duration-300 border border-transparent hover:border-[#630ed4]/20 shadow-sm hover:shadow-md group">
-            <div className="w-16 h-16 rounded-full bg-[#ffffff] group-hover:bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4] transition-colors duration-300 shadow-sm group-hover:shadow-none"><Store size={32} /></div>
-            <span className="text-[14px] font-semibold text-center text-[#1d1a24] group-hover:text-[#630ed4]">Pesanan Online</span>
+          <Link href="/admin/pesanan" className="group bg-admin-surface-container-low hover:bg-admin-surface-container-high hover:shadow-xl hover:shadow-admin-primary/5 transition-all duration-300 rounded-[24px] p-8 flex flex-col items-center gap-5 border border-admin-outline-variant/30 hover:border-admin-primary/30">
+            <div className="w-16 h-16 rounded-2xl bg-admin-surface-container-highest group-hover:bg-admin-primary transition-colors duration-300 flex items-center justify-center text-admin-primary group-hover:text-admin-on-primary shadow-sm">
+              <span className="material-symbols-outlined text-[32px]">storefront</span>
+            </div>
+            <span className="font-label-md text-admin-on-surface group-hover:text-admin-primary transition-colors">Pesanan Online</span>
           </Link>
-          <Link href="/admin/laporan" className="bg-[#f9f1ff] rounded-2xl p-8 flex flex-col items-center justify-center gap-6 hover:bg-[#630ed4]/5 transition-all duration-300 border border-transparent hover:border-[#630ed4]/20 shadow-sm hover:shadow-md group">
-            <div className="w-16 h-16 rounded-full bg-[#ffffff] group-hover:bg-[#630ed4]/10 flex items-center justify-center text-[#630ed4] transition-colors duration-300 shadow-sm group-hover:shadow-none"><BarChart3 size={32} /></div>
-            <span className="text-[14px] font-semibold text-center text-[#1d1a24] group-hover:text-[#630ed4]">Laporan & Analitik</span>
+          <Link href="/admin/laporan" className="group bg-admin-surface-container-low hover:bg-admin-surface-container-high hover:shadow-xl hover:shadow-admin-primary/5 transition-all duration-300 rounded-[24px] p-8 flex flex-col items-center gap-5 border border-admin-outline-variant/30 hover:border-admin-primary/30">
+            <div className="w-16 h-16 rounded-2xl bg-admin-surface-container-highest group-hover:bg-admin-primary transition-colors duration-300 flex items-center justify-center text-admin-primary group-hover:text-admin-on-primary shadow-sm">
+              <span className="material-symbols-outlined text-[32px]">bar_chart</span>
+            </div>
+            <span className="font-label-md text-admin-on-surface group-hover:text-admin-primary transition-colors text-center leading-tight">Laporan & Analitik</span>
           </Link>
         </div>
       </section>
-
     </main>
   );
 }

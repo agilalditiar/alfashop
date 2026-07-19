@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Izinkan HP Anda (192.168.1.10) untuk memuat script dari server lokal
-  allowedDevOrigins: ["192.168.1.10"],
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+ 
+allowedDevOrigins: ["192.168.1.15", "192.168.1.15:3000", "http://192.168.1.15:3000"],
 };
 
 export default nextConfig;

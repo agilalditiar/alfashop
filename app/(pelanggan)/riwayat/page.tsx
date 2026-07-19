@@ -1,192 +1,260 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/lib/supabase';
-import { useCartStore } from '@/store/cartStore';
-import { Search, Package, Clock, CheckCircle2, ReceiptText, X, ShoppingCart, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 
-export default function RiwayatPesananPage() {
+export default function RiwayatPage() {
   const router = useRouter();
-  const addToCart = useCartStore((state) => state.addToCart);
-  
-  const [orders, setOrders] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [searchPhone, setSearchPhone] = useState('');
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [pesanan, setPesanan] = useState<any[]>([]);
+  const [userWA, setUserWA] = useState('');
+  const [searchDate, setSearchDate] = useState('');
+  const [cancelModal, setCancelModal] = useState<number | null>(null);
 
-  useEffect(() => {
-    const user = localStorage.getItem('alfaShopUser');
-    let phoneToSearch = '';
-    if (user) {
-      const parsedUser = JSON.parse(user);
-      phoneToSearch = parsedUser.phone || ''; 
-      setSearchPhone(phoneToSearch);
-    }
-    fetchOrders(phoneToSearch);
-  }, []);
-
-  const fetchOrders = async (phone: string) => {
-    setIsLoading(true);
-    let query = supabase.from('pesanan').select('*').order('created_at', { ascending: false });
-    if (phone) query = query.ilike('whatsapp', `%${phone}%`);
-    const { data } = await query;
-    setOrders(data || []);
-    setIsLoading(false);
+  const loadData = (nomorWA: string) => {
+    setLoading(true);
+    fetch(`/api/riwayat?wa=${encodeURIComponent(nomorWA)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setPesanan(data);
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
   };
 
-  const handleBeliLagi = (order: any) => {
-    order.item_pesanan.forEach((item: any) => {
-      addToCart({
-        id: item.id,
-        nama_produk: item.name,
-        harga: item.price,
-        satuan: item.type,
-        gambar_url: '', 
-        qty: item.quantity
+  useEffect(() => {
+    const userLoggedIn = localStorage.getItem('user');
+    const savedWA = localStorage.getItem('savedWA');
+
+    if (!userLoggedIn) {
+      router.replace('/login');
+      return;
+    }
+
+    const user = JSON.parse(userLoggedIn);
+    const nomorWA = user.whatsapp || user.no_wa || savedWA;
+
+    if (!nomorWA) {
+      setLoading(false);
+      return;
+    }
+    
+    setUserWA(nomorWA);
+    loadData(nomorWA);
+  }, [router]);
+
+  const executeCancel = async () => {
+    if (cancelModal === null) return;
+    
+    try {
+      const res = await fetch('/api/riwayat/batal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pesananId: cancelModal, wa: userWA })
       });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCancelModal(null);
+        loadData(userWA);
+      } else {
+        alert(data.message || 'Gagal membatalkan pesanan');
+      }
+    } catch (err) {
+      alert('Terjadi kesalahan jaringan');
+    }
+  };
+
+  const handlePesanUlang = (items: any[]) => {
+    if (!items || items.length === 0) return alert('Data barang tidak ditemukan untuk dipesan ulang.');
+    const keranjangLama = JSON.parse(localStorage.getItem('keranjang') || '[]');
+    items.forEach(item => {
+      const existingIdx = keranjangLama.findIndex((k: any) => k.id === item.id);
+      if (existingIdx !== -1) {
+        keranjangLama[existingIdx].qty += item.qty;
+      } else {
+        keranjangLama.push({
+          id: item.id,
+          nama_produk: item.nama_produk,
+          gambar_url: item.gambar_url,
+          harga: item.harga, 
+          qty: item.qty,
+          stok: item.stok,
+          kategori: item.kategori
+        });
+      }
     });
-    setSelectedOrder(null);
+    localStorage.setItem('keranjang', JSON.stringify(keranjangLama));
+    window.dispatchEvent(new Event('storage'));
     router.push('/checkout');
   };
 
-  const getStatusConfig = (status: string) => {
-    if (status === 'Menunggu') return { bg: 'bg-[#fffbeb]', text: 'text-[#d97706]', icon: <Clock size={12} /> };
-    if (status === 'Diproses') return { bg: 'bg-[#eff6ff]', text: 'text-[#2563eb]', icon: <Package size={12} /> };
-    return { bg: 'bg-[#ecfdf5]', text: 'text-[#059669]', icon: <CheckCircle2 size={12} /> };
-  };
+  const filteredPesanan = searchDate ? pesanan.filter((order) => {
+    if (!order.created_at) return false;
+    const orderDate = new Date(order.created_at);
+    const year = orderDate.getFullYear();
+    const month = String(orderDate.getMonth() + 1).padStart(2, '0');
+    const day = String(orderDate.getDate()).padStart(2, '0');
+    const formattedDate = `${year}-${month}-${day}`;
+    return formattedDate === searchDate;
+  }) : pesanan;
 
   return (
-    <div className="px-5 pt-6 max-w-md mx-auto font-sans pb-24">
-      <div className="mb-6">
-        <h1 className="text-2xl font-black text-[#1d1a24] tracking-tight mb-1">Riwayat Pesanan</h1>
-        <p className="text-sm font-medium text-[#7b7487]">Lacak dan beli ulang kebutuhan Anda.</p>
-      </div>
-
-      {/* Form Lacak Manual */}
-      <form onSubmit={(e) => { e.preventDefault(); fetchOrders(searchPhone); }} className="bg-white rounded-2xl shadow-[0_4px_20px_rgba(124,58,237,0.03)] border border-[#ffe4e6] p-4 mb-6">
-        <div className="relative flex items-center">
-          <Search size={18} className="absolute left-3 text-[#ccc3d8]" />
-          <input 
-            type="tel" value={searchPhone || ''} onChange={(e) => setSearchPhone(e.target.value)} 
-            placeholder="Lacak nomor WA lain..." 
-            className="w-full pl-10 pr-20 py-3 rounded-xl border border-[#ccc3d8] bg-[#fef7ff] focus:border-[#7c3aed] outline-none text-sm font-medium" 
-          />
-          <button type="submit" className="absolute right-1.5 bg-[#7c3aed] text-white rounded-lg px-3 py-2 text-xs font-bold active:scale-95 transition-all">Cari</button>
+    <div className="bg-[#fef7ff] text-[#1d1a24] min-h-screen flex flex-col pb-24 md:pb-0 pt-16">
+      {/* TopAppBar */}
+      <header className="fixed top-0 left-0 w-full flex justify-between items-center px-6 h-16 bg-white/80 backdrop-blur-md border-b border-[#ffe4e6] shadow-[0_4px_20px_rgba(124,58,237,0.03)] z-50">
+        <Link href="/beranda" className="text-[#7c3aed] hover:bg-[#fff1f2] transition-colors rounded-full p-2 active:scale-95 flex items-center justify-center">
+          <span className="material-symbols-outlined">arrow_back</span>
+        </Link>
+        <div className="font-['Plus_Jakarta_Sans'] font-bold tracking-tight text-2xl text-[#7c3aed]">
+          AlfaShop
         </div>
-      </form>
+        <Link href="/profil" className="w-8 h-8 rounded-full overflow-hidden hover:opacity-80 transition-opacity active:scale-95 bg-[#e8dfee] flex items-center justify-center text-[#7c3aed]">
+          <span className="material-symbols-outlined text-[20px]">person</span>
+        </Link>
+      </header>
 
-      <div className="space-y-4">
-        {isLoading ? (
-          [1, 2, 3].map(n => <div key={n} className="bg-white rounded-2xl border border-[#ffe4e6] p-4 animate-pulse h-32"></div>)
-        ) : orders.length === 0 ? (
-          
-          /* ========================================== */
-          /* TAMPILAN JIKA RIWAYAT KOSONG (EMPTY STATE) */
-          /* ========================================== */
-          <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white rounded-3xl border border-[#ffe4e6] shadow-[0_4px_20px_rgba(124,58,237,0.02)] mt-8">
-            <div className="w-24 h-24 bg-[#fef7ff] rounded-full flex items-center justify-center mb-6 border-4 border-[#fff1f2] shadow-inner">
-              <ReceiptText size={40} className="text-[#d2bbff]" />
-            </div>
-            <h3 className="text-lg font-black text-[#1d1a24] mb-2">Belum Ada Riwayat</h3>
-            <p className="text-sm font-medium text-[#7b7487] mb-8 leading-relaxed">
-              Sepertinya Anda belum pernah melakukan pemesanan. Yuk, lengkapi kebutuhan dapur Anda!
-            </p>
-            <button 
-              onClick={() => router.push('/')}
-              className="bg-[#630ed4] text-white px-8 py-3.5 rounded-full text-sm font-bold shadow-lg shadow-[#630ed4]/20 active:scale-95 transition-all flex items-center gap-2"
-            >
-              <ShoppingCart size={18} /> Mulai Belanja
-            </button>
-          </div>
-          /* ========================================== */
+      {/* Main Canvas */}
+      <main className="flex-grow container mx-auto px-4 md:px-20 py-10 max-w-4xl">
+        {/* Page Title */}
+        <div className="mb-10 mt-6">
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-[#1d1a24] mb-2">Order History</h1>
+          <p className="text-[16px] text-[#4a4455]">Lacak pembelian terakhir Anda dan statusnya.</p>
+        </div>
 
-        ) : (
-          orders.map((order) => {
-            const statusConfig = getStatusConfig(order.status);
-            const shortId = `AS-${order.id.substring(0, 4).toUpperCase()}`;
-            const date = new Date(order.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-            
-            return (
-              <div 
-                key={order.id} 
-                onClick={() => setSelectedOrder(order)}
-                className="bg-white rounded-2xl shadow-sm border border-[#ffe4e6] p-4 hover:border-[#d2bbff] transition-all cursor-pointer group active:scale-[0.98]"
-              >
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-[#7b7487] uppercase tracking-widest">{shortId} • {date}</span>
-                    <h3 className="text-sm font-bold text-[#1d1a24] mt-0.5 flex items-center gap-1">
-                      {order.item_pesanan[0].name} {order.item_pesanan.length > 1 && `+${order.item_pesanan.length - 1} lainnya`}
-                      <ChevronRight size={14} className="text-[#ccc3d8] group-hover:translate-x-1 transition-transform" />
-                    </h3>
-                  </div>
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider ${statusConfig.bg} ${statusConfig.text}`}>
-                    {statusConfig.icon} {order.status}
-                  </span>
-                </div>
-                <div className="text-sm font-black text-[#7c3aed]">Rp {order.total_harga.toLocaleString('id-ID')}</div>
-              </div>
-            );
-          })
-        )}
-      </div>
-
-      {/* MODAL DETAIL PESANAN */}
-      {selectedOrder && (
-        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-[#1d1a24]/40 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-t-[32px] sm:rounded-3xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-300">
-            {/* Header Modal */}
-            <div className="p-6 border-b border-[#f3ebfa] flex justify-between items-center bg-[#fef7ff]">
-              <div>
-                <h3 className="text-lg font-black text-[#1d1a24]">Detail Pesanan</h3>
-                <p className="text-xs font-bold text-[#7c3aed]">AS-{selectedOrder.id.substring(0, 8).toUpperCase()}</p>
-              </div>
-              <button onClick={() => setSelectedOrder(null)} className="p-2 bg-white rounded-full text-[#7b7487] shadow-sm border border-[#ffe4e6] active:scale-90 transition-all">
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Isi Modal */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <div className="space-y-4">
-                <p className="text-[10px] font-black text-[#7b7487] uppercase tracking-widest border-b border-[#f3ebfa] pb-2">Daftar Barang</p>
-                {selectedOrder.item_pesanan.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-center group">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-[#1d1a24]">{item.name}</span>
-                      <span className="text-xs font-medium text-[#7b7487]">{item.quantity} x Rp {item.price.toLocaleString('id-ID')}</span>
-                    </div>
-                    <span className="text-sm font-black text-[#1d1a24]">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                  </div>
-                ))}
-                
-                <div className="mt-6 pt-4 border-t border-dashed border-[#ccc3d8] space-y-2">
-                  <div className="flex justify-between text-xs font-bold text-[#7b7487]">
-                    <span>Alamat Kirim</span>
-                    <span className="text-right text-[#1d1a24]">{selectedOrder.alamat}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-black text-[#1d1a24] pt-2">
-                    <span>Total Bayar</span>
-                    <span className="text-[#630ed4] text-lg">Rp {selectedOrder.total_harga.toLocaleString('id-ID')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Tombol Aksi Modal */}
-            <div className="p-6 bg-white border-t border-[#f3ebfa] grid grid-cols-2 gap-3">
-              <a 
-                href={`https://wa.me/6287728450708?text=Halo%20Admin,%20saya%20ingin%20tanya%20pesanan%20AS-${selectedOrder.id.substring(0,4)}`}
-                className="flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-[#ccc3d8] text-sm font-bold text-[#4a4455] hover:bg-[#fef7ff] transition-all active:scale-95"
-              >
-                Tanya Admin
-              </a>
+        {/* Search Section */}
+        <div className="bg-[#ffffff] rounded-xl shadow-[0_4px_20px_rgba(124,58,237,0.03)] border border-[#ccc3d8] p-6 mb-10">
+          <label className="text-[14px] font-semibold text-[#1d1a24] mb-3 block" htmlFor="date-search">Cari dengan Tanggal Pesanan</label>
+          <div className="relative flex items-center">
+            <span className="material-symbols-outlined absolute left-3 text-[#7b7487]">calendar_today</span>
+            <input 
+              value={searchDate}
+              onChange={(e) => setSearchDate(e.target.value)}
+              className="w-full pl-10 pr-10 py-3 rounded-lg border border-[#ccc3d8] bg-[#fef7ff] focus:border-[#630ed4] focus:ring-1 focus:ring-[#630ed4] outline-none transition-colors text-[16px] text-[#1d1a24]" 
+              id="date-search" 
+              type="date"
+            />
+            {searchDate && (
               <button 
-                onClick={() => handleBeliLagi(selectedOrder)}
-                className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#7c3aed] text-white text-sm font-bold shadow-[0_8px_20px_rgba(124,58,237,0.2)] hover:bg-[#630ed4] transition-all active:scale-95"
+                onClick={() => setSearchDate('')}
+                className="absolute right-3 text-[#7b7487] hover:text-[#1d1a24] p-1 rounded-full hover:bg-[#f3f4f5] flex items-center justify-center transition-colors"
+                title="Hapus filter tanggal"
               >
-                <ShoppingCart size={18} /> Beli Lagi
+                <span className="material-symbols-outlined text-[20px]">close</span>
               </button>
+            )}
+          </div>
+        </div>
+
+        {/* Order List */}
+        <div className="space-y-6">
+          {loading ? (
+            <div className="flex justify-center items-center py-10 text-[#7c3aed]">
+               <span className="material-symbols-outlined animate-spin text-4xl">progress_activity</span>
+            </div>
+          ) : filteredPesanan.length === 0 ? (
+            <div className="text-center py-10 text-[#7b7487]">
+              {searchDate ? 'Belum ada pesanan untuk tanggal ini.' : 'Belum ada pesanan.'}
+            </div>
+          ) : (
+            filteredPesanan.map((order, idx) => {
+              const isWaiting = order.status === 'Menunggu' || order.status === 'Proses';
+              const isCompleted = order.status === 'Selesai';
+              const isCanceled = order.status === 'Dibatalkan' || order.status === 'Batal';
+              const dateStr = order.created_at ? new Date(order.created_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+              
+              let statusBg = 'bg-[#eaddff]';
+              let statusText = 'text-[#25005a]';
+              let statusDot = 'bg-[#630ed4]';
+              let statusIcon = '';
+              let opacityClass = '';
+
+              if (isWaiting) {
+                statusBg = 'bg-[#ffdcc6]';
+                statusText = 'text-[#713700]';
+                statusDot = 'bg-[#7d3d00]';
+              } else if (isCompleted) {
+                statusBg = 'bg-[#e8dfee]';
+                statusText = 'text-[#4a4455]';
+                statusIcon = 'check_circle';
+                opacityClass = 'opacity-75 hover:opacity-100 hover:bg-[#f9f1ff] transition-all';
+              } else if (isCanceled) {
+                statusBg = 'bg-[#ffdad6]';
+                statusText = 'text-[#93000a]';
+                statusIcon = 'cancel';
+                opacityClass = 'opacity-75 hover:opacity-100 transition-all';
+              }
+
+              return (
+                <div key={idx} className={`bg-[#ffffff] rounded-xl shadow-[0_4px_20px_rgba(124,58,237,0.03)] border border-[#ccc3d8] p-6 flex flex-col md:flex-row gap-6 items-start md:items-center hover:bg-[#f9f1ff] transition-colors ${opacityClass}`}>
+                  <div className="flex-1 w-full">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <span className="text-[12px] font-medium text-[#7b7487]">Order #AS-{order.id.toString().padStart(4, '0')}</span>
+                        <h3 className="text-[14px] font-semibold text-[#1d1a24] mt-1">{dateStr}</h3>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full ${statusBg} ${statusText} text-[12px] font-medium`}>
+                        {statusIcon ? (
+                           <span className="material-symbols-outlined text-[14px] mr-1">{statusIcon}</span>
+                        ) : (
+                           <span className={`w-2 h-2 rounded-full ${statusDot} mr-1`}></span>
+                        )}
+                        {order.status}
+                      </span>
+                    </div>
+                    
+                    <div className="mt-4 mb-4">
+                       {order.items && order.items.length > 0 ? (
+                         order.items.map((it:any, i:number) => (
+                           <p key={i} className="text-[16px] text-[#4a4455] line-clamp-1" title={it.nama_produk}>{it.qty}x {it.nama_produk}</p>
+                         ))
+                       ) : (
+                         <p className="text-[16px] text-[#4a4455]">Item Pesanan</p>
+                       )}
+                    </div>
+
+                    <div className="text-[14px] font-semibold text-[#630ed4]">Total: Rp {order.total_harga?.toLocaleString('id-ID')}</div>
+                  </div>
+                  <div className="w-full md:w-auto flex flex-col gap-2">
+                    <button onClick={() => router.push(`/riwayat/${order.id}`)} className="w-full md:w-auto bg-[#f3ebfa] text-[#630ed4] rounded-lg px-6 py-3 text-[14px] font-semibold hover:bg-[#eaddff] transition-colors text-center border border-[#eaddff]">Detail</button>
+                    {isWaiting && (
+                      <button onClick={() => setCancelModal(order.id)} className="w-full md:w-auto bg-[#fff1f2] text-[#e11d48] rounded-lg px-6 py-3 text-[14px] font-semibold hover:bg-[#ffe4e6] transition-colors text-center border border-[#ffe4e6]">Batalkan</button>
+                    )}
+                    {(isCompleted || isCanceled) && (
+                      <button onClick={() => handlePesanUlang(order.items)} className="w-full md:w-auto text-[#655c5d] rounded-lg px-6 py-3 text-[14px] font-semibold hover:bg-[#e8dfee] transition-colors text-center border border-transparent">Beli Lagi</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </main>
+
+      {/* BottomNavBar (Mobile Only) */}
+      <nav className="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pb-safe h-20 bg-white/90 backdrop-blur-lg rounded-t-2xl border-t border-[#ffe4e6] shadow-[0_-4px_20px_rgba(124,58,237,0.05)] z-50">
+        <Link href="/beranda" className="flex flex-col items-center justify-center text-[#a1a1aa] px-4 py-1.5 hover:text-[#8b5cf6] transition-all active:opacity-80">
+          <span className="material-symbols-outlined mb-1">home</span>
+          <span className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold">Beranda</span>
+        </Link>
+        <Link href="/checkout" className="flex flex-col items-center justify-center text-[#a1a1aa] px-4 py-1.5 hover:text-[#8b5cf6] transition-all active:opacity-80">
+          <span className="material-symbols-outlined mb-1">shopping_cart</span>
+          <span className="font-['Plus_Jakarta_Sans'] text-[11px] font-semibold">Keranjang</span>
+        </Link>
+        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="flex flex-col items-center justify-center bg-[#fff1f2] text-[#7c3aed] rounded-xl px-4 py-1.5 transition-all active:opacity-80">
+          <span className="material-symbols-outlined mb-1" style={{fontVariationSettings: "'FILL' 1"}}>history</span>
+          <span className="font-['Plus_Jakarta_Sans'] text-[11px] font-bold text-[#7c3aed]">Riwayat</span>
+        </button>
+      </nav>
+
+      {/* Cancel Modal */}
+      {cancelModal !== null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-[#ffffff] rounded-2xl shadow-xl w-[90%] max-w-[400px] p-6 md:p-8 border border-[#ccc3d8] animate-in fade-in zoom-in-95 duration-200">
+            <h2 className="text-[20px] md:text-[24px] font-semibold text-[#1d1a24] mb-3">Batalkan Pesanan?</h2>
+            <p className="text-[14px] md:text-[16px] text-[#4a4455] mb-8 md:mb-10">Apakah Anda yakin ingin membatalkan pesanan ini? Tindakan ini tidak dapat dibatalkan.</p>
+            <div className="flex flex-col gap-3">
+              <button onClick={executeCancel} className="w-full bg-[#e11d48] text-white rounded-xl py-3 text-[14px] font-semibold hover:opacity-90 transition-opacity">Ya, Batalkan</button>
+              <button onClick={() => setCancelModal(null)} className="w-full bg-[#f3ebfa] text-[#4a4455] rounded-xl py-3 text-[14px] font-semibold hover:bg-[#e8dfee] transition-colors">Kembali</button>
             </div>
           </div>
         </div>

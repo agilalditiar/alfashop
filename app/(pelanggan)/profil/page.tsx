@@ -1,145 +1,242 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { User, Phone, MapPin, Edit2, Save, X, Loader2, CheckCircle2, AlertCircle, LogOut } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useUserStore } from '@/store/userStore';
-import { ArrowLeft, User, Phone, MapPin, LogOut, Edit2, Save, ChevronLeft } from 'lucide-react';
-import Link from 'next/link';
 
-export default function ProfilPage() {
+export default function ProfilPelangganPage() {
   const router = useRouter();
-  
-  // Panggil data dan fungsi dari Zustand
-  const { user, login, logout } = useUserStore();
-  
-  // State untuk mode edit dan data form
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [pesanSukses, setPesanSukses] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
   const [formData, setFormData] = useState({
+    id: 1, // Pastikan ini nanti dinamis dari Session Login
     nama: '',
     whatsapp: '',
-    alamat: ''
+    alamat: '',
   });
 
-  // Isi form otomatis dengan data user saat halaman dimuat
+  const [backupData, setBackupData] = useState(formData);
+
   useEffect(() => {
-    if (user) {
-      setFormData({
-        nama: user.name || '',
-        whatsapp: user.phone || '',
-        alamat: user.address || ''
-      });
-    } else {
-      // Jika terdeteksi belum login tapi masuk ke halaman ini, lempar ke beranda
-      router.push('/');
+    // Ambil session login dari localStorage
+    let userId = 1;
+    const userLoggedIn = localStorage.getItem('user');
+    if (userLoggedIn) {
+      try {
+        const user = JSON.parse(userLoggedIn);
+        if (user.id) userId = user.id;
+      } catch (e) {}
     }
-  }, [user, router]);
 
-  // Fungsi simpan perubahan
-  const handleSave = () => {
-    // Kita gunakan fungsi 'login' dari Zustand untuk menimpa/memperbarui data di memori
-    login({
-      name: formData.nama,
-      phone: formData.whatsapp,
-      address: formData.alamat
-    });
+    setFormData(prev => ({ ...prev, id: userId }));
+
+    const fetchProfil = async () => {
+      try {
+        const res = await fetch(`/api/profil?id=${userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          const finalData = { ...data, id: userId };
+          setFormData(finalData);
+          setBackupData(finalData);
+        }
+      } catch (error) {
+        console.error("Gagal menarik data profil:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchProfil();
+  }, []);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    setErrorMsg(''); // Hilangkan error saat user mulai ngetik
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleCancel = () => {
+    setFormData(backupData);
     setIsEditing(false);
-    alert("Data profil berhasil diperbarui!");
+    setErrorMsg('');
   };
 
-  // Fungsi Logout
-  const handleLogout = () => {
-    const konfirmasi = window.confirm("Apakah Anda yakin ingin keluar dari akun?");
-    if (konfirmasi) {
-      logout(); // Hapus memori di Zustand & localStorage
-      router.push('/'); // Lempar ke Beranda
+  const handleSave = async () => {
+    // Validasi Sederhana
+    if (!formData.nama.trim() || !formData.whatsapp.trim()) {
+      setErrorMsg('Nama dan WhatsApp tidak boleh kosong!');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res = await fetch('/api/profil', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+
+      if (!res.ok) throw new Error('Gagal update data');
+
+      setBackupData(formData); 
+      setIsEditing(false);
+      setPesanSukses(true);
+      setTimeout(() => setPesanSukses(false), 3000);
+
+    } catch (error) {
+      setErrorMsg("Terjadi kesalahan jaringan saat menyimpan profil.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  // Cegah error render jika data user belum siap
-  if (!user) return null; 
+  if (isLoading) {
+    return (
+      <div className="w-full h-[70vh] flex flex-col justify-center items-center gap-3">
+        <Loader2 className="animate-spin text-[#500088]" size={36} />
+        <p className="text-[#7e7383] text-sm font-medium animate-pulse">Memuat profil...</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="w-full min-h-screen bg-[#fef7ff] pb-32">
-      
-      {/* HEADER */}
-      <div className="bg-white px-5 pt-6 pb-4 flex items-center gap-3 border-b border-[#ffe4e6] sticky top-0 z-20">
-        <button onClick={() => router.back()} className="p-2 bg-[#fef7ff] rounded-xl border border-[#ffe4e6] text-[#7b7487] active:scale-90 transition-all">
-          <ChevronLeft size={20} />
-        </button>
-        <h1 className="text-xl font-black text-[#1d1a24] tracking-tight">Profil Saya</h1>
-      </div>
-
-      <div className="px-5 mt-6 max-w-2xl mx-auto space-y-6">
+    <div className="w-full px-4 pt-4 pb-8 animate-in fade-in duration-500 slide-in-from-bottom-4">
+      <div className="w-full bg-white rounded-3xl shadow-sm border border-[#cfc2d4]/30 overflow-hidden">
         
-        {/* KARTU PROFIL ATAS */}
-        <div className="bg-white rounded-3xl border border-[#ffe4e6] p-6 shadow-sm flex flex-col items-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-16 bg-gradient-to-r from-[#eaddff] to-[#f9f1ff]"></div>
+        {/* Header Section */}
+        <div className="bg-gradient-to-br from-[#500088] via-[#7a00cc] to-[#9900ff] p-6 text-white flex flex-col sm:flex-row justify-between items-center sm:items-start relative overflow-hidden gap-4 sm:gap-0">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#500088]/50 rounded-full blur-2xl -ml-10 -mb-10 pointer-events-none"></div>
           
-          <div className="w-24 h-24 rounded-full bg-white border-4 border-white shadow-lg text-[#630ed4] flex items-center justify-center font-black text-3xl relative z-10">
-            {user.name?.substring(0, 2).toUpperCase() || 'US'}
+          <div className="relative z-10 flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+            <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-full flex items-center justify-center border border-white/30 shadow-inner shrink-0">
+              <User size={32} className="text-white" strokeWidth={1.5} />
+            </div>
+            <div className="flex flex-col items-center sm:items-start">
+              <h2 className="text-xl font-black mb-0.5 line-clamp-1 tracking-tight">{backupData.nama || 'Pengguna'}</h2>
+              <p className="text-white/90 text-[11px] font-bold tracking-wider uppercase bg-white/20 px-2.5 py-0.5 rounded-full w-max mt-1">Pelanggan</p>
+            </div>
           </div>
           
-          <h2 className="mt-3 text-xl font-black text-[#1d1a24]">{user.name}</h2>
-          <p className="text-sm font-semibold text-[#7b7487]">+62 {user.phone}</p>
+          {!isEditing && (
+            <button 
+              onClick={() => setIsEditing(true)}
+              className="relative z-10 w-full sm:w-auto bg-white/20 hover:bg-white/30 backdrop-blur-md px-4 py-2.5 sm:p-2.5 rounded-2xl transition-all shadow-sm active:scale-95 flex justify-center items-center gap-2"
+              title="Edit Profil"
+            >
+              <Edit2 size={20} className="text-white" />
+              <span className="sm:hidden font-bold">Edit Profil</span>
+            </button>
+          )}
         </div>
 
-        {/* KARTU EDIT DATA */}
-        <div className="bg-white rounded-3xl border border-[#ffe4e6] p-6 shadow-sm space-y-5">
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="text-sm font-black text-[#630ed4] uppercase tracking-widest">Data Pribadi</h3>
+        {/* Form / Detail Area */}
+        <div className="p-6 space-y-5">
+          
+          {/* Notifikasi Alert - diletakkan di dalam agar lebih rapi */}
+          {pesanSukses && (
+            <div className="bg-[#ecfdf5] border border-[#059669]/20 rounded-2xl p-3.5 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+              <CheckCircle2 className="text-[#059669] shrink-0" size={20} />
+              <p className="text-sm font-bold text-[#059669]">Profil berhasil diperbarui!</p>
+            </div>
+          )}
+          {errorMsg && (
+            <div className="bg-red-50 border border-red-200 rounded-2xl p-3.5 flex items-center gap-3 animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="text-red-500 shrink-0" size={20} />
+              <p className="text-sm font-bold text-red-600">{errorMsg}</p>
+            </div>
+          )}
+
+          {/* Field: Nama */}
+          <div className="group">
+            <label className="text-xs font-black text-[#7e7383] uppercase flex items-center gap-2 mb-2 ml-1 tracking-wider">
+              <User size={14} className={isEditing ? "text-[#500088]" : ""} /> Nama Lengkap
+            </label>
+            {isEditing ? (
+              <input 
+                type="text" name="nama" value={formData.nama} onChange={handleChange} placeholder="Masukkan nama..."
+                className="w-full bg-[#f8f9fa] border border-[#cfc2d4]/50 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm focus:outline-none focus:border-[#500088] focus:ring-4 focus:ring-[#500088]/10 transition-all font-bold"
+              />
+            ) : (
+              <div className="bg-[#f8f9fa] border border-[#cfc2d4]/30 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm font-bold">
+                {formData.nama || <span className="text-[#cfc2d4] italic font-medium">Belum diatur</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Field: WhatsApp */}
+          <div className="group">
+            <label className="text-xs font-black text-[#7e7383] uppercase flex items-center gap-2 mb-2 ml-1 tracking-wider">
+              <Phone size={14} className={isEditing ? "text-[#500088]" : ""} /> No. WhatsApp
+            </label>
+            {isEditing ? (
+              <input 
+                type="tel" name="whatsapp" value={formData.whatsapp} onChange={handleChange} placeholder="08..."
+                className="w-full bg-[#f8f9fa] border border-[#cfc2d4]/50 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm focus:outline-none focus:border-[#500088] focus:ring-4 focus:ring-[#500088]/10 transition-all font-bold"
+              />
+            ) : (
+              <div className="bg-[#f8f9fa] border border-[#cfc2d4]/30 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm font-bold">
+                {formData.whatsapp || <span className="text-[#cfc2d4] italic font-medium">Belum diatur</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Field: Alamat */}
+          <div className="group">
+            <label className="text-xs font-black text-[#7e7383] uppercase flex items-center gap-2 mb-2 ml-1 tracking-wider">
+              <MapPin size={14} className={isEditing ? "text-[#500088]" : ""} /> Alamat Pengiriman
+            </label>
+            {isEditing ? (
+              <textarea 
+                name="alamat" value={formData.alamat} onChange={handleChange} rows={3} placeholder="Tulis alamat lengkap..."
+                className="w-full bg-[#f8f9fa] border border-[#cfc2d4]/50 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm focus:outline-none focus:border-[#500088] focus:ring-4 focus:ring-[#500088]/10 transition-all resize-none font-bold"
+              ></textarea>
+            ) : (
+              <div className="bg-[#f8f9fa] border border-[#cfc2d4]/30 rounded-2xl px-4 py-3.5 text-[#191c1d] text-sm font-bold leading-relaxed min-h-[80px]">
+                {formData.alamat || <span className="text-[#cfc2d4] italic font-medium">Belum diatur</span>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        {isEditing && (
+          <div className="p-6 pt-2 flex gap-3 animate-in fade-in slide-in-from-bottom-2">
             <button 
-              onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${isEditing ? 'bg-[#ecfdf5] text-[#059669] active:scale-95' : 'bg-[#f3ebfa] text-[#7c3aed] active:scale-95'}`}
+              onClick={handleCancel}
+              disabled={isSaving}
+              className="flex-1 py-3.5 px-4 rounded-2xl border-2 border-[#cfc2d4]/30 text-[#7e7383] font-black flex justify-center items-center gap-2 hover:bg-[#f8f9fa] hover:text-[#191c1d] transition-colors disabled:opacity-50 active:scale-95 text-sm"
             >
-              {isEditing ? <><Save size={14} /> Simpan</> : <><Edit2 size={14} /> Edit Data</>}
+              <X size={18} strokeWidth={2.5} /> Batal
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex-[2] py-3.5 px-4 rounded-2xl bg-[#500088] text-white font-black flex justify-center items-center gap-2 hover:bg-[#7a00cc] shadow-[0px_8px_16px_rgba(80,0,136,0.2)] transition-all disabled:opacity-50 active:scale-95 text-sm"
+            >
+              {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} strokeWidth={2.5} />}
+              {isSaving ? 'Menyimpan...' : 'Simpan Profil'}
             </button>
           </div>
+        )}
 
-          {/* Input Nama */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#7b7487] ml-1 flex items-center gap-1.5"><User size={14}/> Nama Lengkap</label>
-            <input 
-              type="text" 
-              value={formData.nama} 
-              onChange={(e) => setFormData({...formData, nama: e.target.value})}
-              disabled={!isEditing}
-              className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all outline-none ${isEditing ? 'bg-[#fef7ff] border border-[#7c3aed] text-[#1d1a24]' : 'bg-gray-50 border border-transparent text-gray-500'}`}
-            />
+        {/* Logout Button */}
+        {!isEditing && (
+          <div className="p-6 pt-2 flex animate-in fade-in slide-in-from-bottom-2">
+            <button 
+              onClick={() => {
+                localStorage.removeItem('user'); // Hapus sesi
+                router.push('/login'); // Kembali ke login
+              }}
+              className="w-full py-3.5 px-4 rounded-2xl border-2 border-red-100 text-red-500 font-black flex justify-center items-center gap-2 hover:bg-red-50 hover:border-red-200 transition-all active:scale-95 text-sm"
+            >
+              <LogOut size={18} strokeWidth={2.5} /> Keluar (Logout)
+            </button>
           </div>
-
-          {/* Input WhatsApp */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#7b7487] ml-1 flex items-center gap-1.5"><Phone size={14}/> Nomor WhatsApp</label>
-            <input 
-              type="tel" 
-              value={formData.whatsapp} 
-              onChange={(e) => setFormData({...formData, whatsapp: e.target.value})}
-              disabled={!isEditing}
-              className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all outline-none ${isEditing ? 'bg-[#fef7ff] border border-[#7c3aed] text-[#1d1a24]' : 'bg-gray-50 border border-transparent text-gray-500'}`}
-            />
-          </div>
-
-          {/* Input Alamat */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-[#7b7487] ml-1 flex items-center gap-1.5"><MapPin size={14}/> Alamat Lengkap</label>
-            <textarea 
-              rows={3}
-              value={formData.alamat} 
-              onChange={(e) => setFormData({...formData, alamat: e.target.value})}
-              disabled={!isEditing}
-              placeholder={isEditing ? "Masukkan alamat lengkap Anda..." : "Alamat belum diatur"}
-              className={`w-full px-4 py-3 rounded-xl text-sm font-bold transition-all outline-none resize-none ${isEditing ? 'bg-[#fef7ff] border border-[#7c3aed] text-[#1d1a24]' : 'bg-gray-50 border border-transparent text-gray-500'}`}
-            />
-          </div>
-        </div>
-
-        {/* TOMBOL LOGOUT */}
-        <button 
-          onClick={handleLogout}
-          className="w-full mt-4 bg-[#fff1f2] border border-[#ffe4e6] text-[#e11d48] py-4 rounded-2xl font-black shadow-sm hover:bg-[#ffe4e6] active:scale-[0.98] transition-all flex justify-center items-center gap-2"
-        >
-          <LogOut size={20} />
-          KELUAR AKUN
-        </button>
+        )}
 
       </div>
     </div>

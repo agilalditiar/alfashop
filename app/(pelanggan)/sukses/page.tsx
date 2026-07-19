@@ -1,57 +1,64 @@
 'use client';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, ArrowRight } from 'lucide-react';
-import { useEffect } from 'react';
+import { CheckCircle2, Home } from 'lucide-react';
+import Link from 'next/link';
 
-export default function PesananSuksesPage() {
+export default function SuksesPage() {
   const router = useRouter();
 
-  // Opsi: Hilangkan halaman ini dari riwayat tombol "Back" (agar user tidak bisa back ke halaman sukses)
-  useEffect(() => {
-    // Anda bisa menambahkan confetti atau efek suara sukses di sini jika mau
-  }, []);
-
   return (
-    <div className="min-h-[70vh] flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans">
+    <div className="bg-[#f8f9fa] text-[#191c1d] min-h-screen flex items-center justify-center overflow-hidden font-sans">
       
-      {/* Decorative Ambient Background (Animasi Blobs) */}
-      <div className="absolute inset-0 z-0 pointer-events-none opacity-40 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-[#eaddff] rounded-full mix-blend-multiply blur-[80px] animate-pulse"></div>
-        <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-[#ffdcc6] rounded-full mix-blend-multiply blur-[60px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-      </div>
-
-      <div className="relative z-10 w-full max-w-sm flex flex-col items-center text-center">
+      {/* --- Mobile Constraint Container --- */}
+      <main className="w-full max-w-[428px] min-h-screen relative flex flex-col items-center justify-center px-4 z-10">
         
-        {/* Icon Container with Glow */}
-        <div className="relative mb-8">
-          <div className="absolute inset-0 bg-[#630ed4]/20 rounded-full blur-2xl transform scale-110"></div>
-          <div className="relative bg-[#ede5f4] w-28 h-28 rounded-full flex items-center justify-center shadow-[0_8px_30px_rgba(124,58,237,0.1)] border border-[#e8dfee]">
-            <CheckCircle2 size={56} className="text-[#630ed4]" strokeWidth={2.5} />
+        {/* --- Abstract Background Glows --- */}
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-[10%] left-[-10%] w-64 h-64 bg-[#f1dbff]/60 rounded-full mix-blend-multiply filter blur-[80px] opacity-80 animate-pulse"></div>
+          <div className="absolute bottom-[20%] right-[-10%] w-72 h-72 bg-[#ffb0cd]/50 rounded-full mix-blend-multiply filter blur-[80px] opacity-70 animate-pulse delay-700"></div>
+          <div className="absolute top-[40%] left-[20%] w-48 h-48 bg-[#f1dbff]/40 rounded-full mix-blend-multiply filter blur-[60px] opacity-60 animate-pulse delay-1000"></div>
+        </div>
+
+        {/* --- Success Content Canvas --- */}
+        <div className="relative z-10 flex flex-col items-center text-center bg-white/40 backdrop-blur-md rounded-2xl p-6 border border-[#e1e3e4]/50 shadow-[0px_8px_32px_rgba(0,0,0,0.04)] w-full">
+          
+          {/* Icon Container with Custom Glow Animation */}
+          <div className="relative mb-8 flex items-center justify-center">
+            {/* Decorative background rings */}
+            <div className="absolute w-32 h-32 bg-[#f1dbff] rounded-full animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite] opacity-30"></div>
+            <div className="absolute w-24 h-24 bg-[#dfb7ff] rounded-full opacity-30"></div>
+            
+            {/* Main Icon */}
+            <CheckCircle2 size={80} className="text-[#500088] relative z-10 drop-shadow-sm" strokeWidth={2} />
           </div>
+
+          {/* Typography */}
+          <h1 className="text-[26px] font-bold text-[#500088] mb-2 tracking-tight leading-tight">
+            Pesanan Berhasil<br/>Diproses
+          </h1>
+          <p className="text-[16px] text-[#4c4452] mb-8 max-w-[280px]">
+            Terima kasih! Pesanan Anda sedang kami siapkan dan akan segera dikirimkan.
+          </p>
+
+          {/* Action Button */}
+          <button 
+            onClick={() => router.push('/beranda')}
+            className="w-full bg-[#f1dbff] text-[#500088] font-bold py-3.5 rounded-xl hover:bg-[#e4c2f7] transition-colors active:scale-95 transition-all shadow-[0px_4px_12px_rgba(80,0,136,0.2)] flex items-center justify-center gap-2"
+          >
+            <Home size={20} />
+            Kembali ke Beranda
+          </button>
+
+          {/* Secondary Action Link */}
+          <Link 
+            href="/riwayat" 
+            className="mt-6 text-[14px] text-[#500088] font-semibold hover:underline underline-offset-4"
+          >
+            Lihat Detail Pesanan
+          </Link>
+          
         </div>
-
-        {/* Typography */}
-        <h1 className="text-3xl font-black text-[#1d1a24] tracking-tight mb-3">
-          Pesanan Berhasil
-        </h1>
-        <p className="text-sm font-medium text-[#4d4546] mb-10 px-4">
-          Admin sedang menyiapkan barang Anda. Silakan siapkan uang tunai.
-        </p>
-
-        {/* Primary Action Button */}
-        <button 
-          onClick={() => router.push('/')}
-          className="w-full bg-[#630ed4] text-white py-4 px-6 rounded-full text-sm font-bold shadow-[0_4px_20px_rgba(99,14,212,0.2)] hover:bg-[#732ee4] hover:-translate-y-0.5 transition-all duration-300 active:scale-95 flex items-center justify-center gap-2"
-        >
-          Kembali ke Beranda <ArrowRight size={18} />
-        </button>
-
-        {/* Footer Note */}
-        <div className="mt-8 pt-8 border-t border-[#ccc3d8]/30 w-full flex justify-center opacity-60">
-          <span className="text-[10px] font-bold text-[#7b7487] uppercase tracking-widest">AlfaShop Secure Order</span>
-        </div>
-
-      </div>
+      </main>
     </div>
   );
 }

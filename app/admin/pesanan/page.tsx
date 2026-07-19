@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-import { Search, Bell, Clock, MapPin, MessageCircle, Truck, CheckCheck, RefreshCw, ReceiptText } from 'lucide-react';
+import { Search, Bell, Clock, MessageCircle, Truck, CheckCheck, RefreshCw, ReceiptText, Printer, FileText, Download, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import Link from 'next/link';
 
 export default function PesananAdminPage() {
   const [pesananList, setPesananList] = useState<any[]>([]);
@@ -9,195 +9,282 @@ export default function PesananAdminPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. Ambil Data Pesanan
-  const fetchPesanan = async () => {
-    setIsLoading(true);
-    const { data } = await supabase.from('pesanan').select('*').order('created_at', { ascending: false });
-    setPesananList(data || []);
-    setIsLoading(false);
+  // 1. FRONTEND: Ambil Data Pesanan dari API
+  const fetchPesanan = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true); 
+    try {
+      const res = await fetch(`/api/admin/pesanan?t=${new Date().getTime()}`, { cache: 'no-store' });
+      const data = await res.json();
+      setPesananList(data || []);
+    } catch (error) {
+      console.error("Gagal mengambil data pesanan:", error);
+    } finally {
+      if (!isSilent) setIsLoading(false);
+    }
   };
 
   useEffect(() => { fetchPesanan(); }, []);
 
-  // 2. Fungsi Ubah Status
-  const updateStatus = async (id: string, statusSekarang: string) => {
+  // 2. FRONTEND: Fungsi Ubah Status (Super Optimistic UI Anti-Kedip)
+  const updateStatus = async (id: any, statusSekarang: string) => {
+    let currentStatus = (statusSekarang || '').trim().toLowerCase();
+    if (currentStatus === '') currentStatus = 'menunggu';
+
     let statusBaru = '';
-    if (statusSekarang === 'Menunggu') statusBaru = 'Diproses';
-    else if (statusSekarang === 'Diproses') statusBaru = 'Selesai';
+    if (currentStatus === 'menunggu') statusBaru = 'Diproses';
+    else if (currentStatus === 'diproses') statusBaru = 'Selesai';
     else return;
 
-    if (window.confirm(`Tandai pesanan ini menjadi "${statusBaru}"?`)) {
-      await supabase.from('pesanan').update({ status: statusBaru }).eq('id', id);
-      fetchPesanan();
+    if (!window.confirm(`Tandai pesanan ini menjadi "${statusBaru}"?`)) return;
+
+    const backupPesanan = [...pesananList];
+
+    setPesananList((prevList) => 
+      prevList.map(p => p.id.toString() === id.toString() ? { ...p, status: statusBaru } : p)
+    );
+
+    try {
+      const res = await fetch('/api/admin/pesanan', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: statusBaru }),
+      });
+
+      if (!res.ok) {
+        alert('Gagal mengupdate status pesanan di database.');
+        setPesananList(backupPesanan);
+      }
+    } catch (error) {
+      console.error("Error update status:", error);
+      alert('Terjadi kesalahan jaringan.');
+      setPesananList(backupPesanan); 
     }
   };
 
   // 3. Hitung & Filter Data
   const filteredPesanan = pesananList.filter((p) => {
-    const matchStatus = filter === 'Semua' ? true : p.status === filter;
+    let pStatus = (p.status || '').trim().toLowerCase();
+    if (pStatus === '') pStatus = 'menunggu';
+
+    const fStatus = filter.trim().toLowerCase();
+    const matchStatus = filter === 'Semua' ? true : pStatus === fStatus;
     const matchSearch = p.nama_pelanggan.toLowerCase().includes(searchQuery.toLowerCase()) || p.id.toString().toLowerCase().includes(searchQuery.toLowerCase());
     return matchStatus && matchSearch;
   });
 
   const counts = {
     Semua: pesananList.length,
-    Menunggu: pesananList.filter(p => p.status === 'Menunggu').length,
-    Diproses: pesananList.filter(p => p.status === 'Diproses').length,
+    Menunggu: pesananList.filter(p => {
+      const s = (p.status || '').trim().toLowerCase();
+      return s === 'menunggu' || s === '';
+    }).length,
+    Diproses: pesananList.filter(p => (p.status || '').trim().toLowerCase() === 'diproses').length,
+    Selesai: pesananList.filter(p => (p.status || '').trim().toLowerCase() === 'selesai').length,
   };
 
-  // 4. Konfigurasi Visual Status (Lumina Style)
-  const getStatusConfig = (status: string) => {
-    if (status === 'Menunggu') return { 
-      badgeBg: 'bg-[#eddfe0]', badgeText: 'text-[#6c6263]', icon: <Clock size={14} />, 
-      btnBg: 'bg-[#630ed4]', btnText: 'text-white', btnHover: 'hover:bg-[#732ee4]', btnIcon: <Truck size={18} />, btnLabel: 'Proses Pesanan' 
+  const getStatusStyle = (status: string) => {
+    let s = (status || '').trim().toLowerCase();
+    if (s === '') s = 'menunggu';
+
+    if (s === 'menunggu') return {
+      badge: 'bg-admin-tertiary-container/20 text-admin-tertiary border-admin-tertiary-container/30',
+      dot: 'bg-admin-tertiary',
+      label: 'Menunggu'
     };
-    if (status === 'Diproses') return { 
-      badgeBg: 'bg-[#630ed4]', badgeText: 'text-white', icon: <RefreshCw size={14} className="animate-spin-slow" />, 
-      btnBg: 'bg-[#10b981]', btnText: 'text-white', btnHover: 'hover:bg-[#059669]', btnIcon: <CheckCheck size={18} />, btnLabel: 'Selesaikan' 
+    if (s === 'diproses') return {
+      badge: 'bg-admin-secondary-container/20 text-admin-secondary border-admin-secondary-container/50',
+      dot: 'bg-admin-secondary animate-pulse',
+      label: 'Diproses'
     };
-    return { 
-      badgeBg: 'bg-[#e8dfee]', badgeText: 'text-[#4a4455]', icon: <CheckCheck size={14} />, 
-      btnBg: 'bg-[#f3ebfa]', btnText: 'text-[#7b7487]', btnHover: '', btnIcon: <CheckCheck size={18} />, btnLabel: 'Telah Selesai', disabled: true 
+    return {
+      badge: 'bg-admin-primary/10 text-admin-primary border-admin-primary/20',
+      dot: '',
+      label: 'Selesai'
     };
   };
 
   return (
-    // Disesuaikan w-full dan paddingnya agar rata kiri dengan layout.tsx
-    <main className="flex-1 p-6 md:p-10 w-full flex flex-col font-sans">
+    <main className="flex-1 p-6 md:p-12 w-full max-w-[1440px] mx-auto flex flex-col font-body-md text-admin-on-surface">
       
-      {/* Header Section (Toolbar Spesifik Pesanan) */}
-      <section className="relative bg-[#fef7ff]/90 border-b border-[#e8dfee] pb-4 mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h2 className="text-3xl font-bold text-[#1d1a24] tracking-tight">Pesanan Masuk</h2>
-            <p className="text-sm font-medium text-[#4a4455] mt-1">Kelola dan lacak permintaan pelanggan aktif.</p>
-          </div>
-          
-          {/* Search & Actions */}
-          <div className="flex items-center gap-3">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#7b7487]" size={18} />
-              <input 
-                type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-[#f3ebfa] border border-transparent rounded-full pl-10 pr-4 py-2 text-sm text-[#1d1a24] placeholder:text-[#7b7487] focus:border-[#630ed4] focus:ring-1 focus:ring-[#630ed4] transition-colors outline-none" 
-                placeholder="Cari pesanan..."
-              />
-            </div>
-            <button onClick={fetchPesanan} className="w-10 h-10 shrink-0 rounded-full bg-[#f3ebfa] flex items-center justify-center text-[#1d1a24] hover:bg-[#e8dfee] transition-colors" title="Segarkan Data">
-              <RefreshCw size={18} className={isLoading ? "animate-spin" : ""} />
-            </button>
-            <button className="w-10 h-10 shrink-0 rounded-full bg-[#f3ebfa] flex items-center justify-center text-[#1d1a24] hover:bg-[#e8dfee] transition-colors relative">
-              <Bell size={18} />
-              {counts.Menunggu > 0 && <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-[#ba1a1a]"></span>}
-            </button>
-          </div>
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-8 gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-admin-on-surface tracking-tight mb-2">Manajemen Pesanan</h1>
+          <p className="text-sm font-medium text-admin-on-surface-variant">Lacak, kelola, dan proses pesanan pelanggan di semua saluran.</p>
         </div>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <button onClick={() => alert('Fitur Ekspor CSV akan segera hadir!')} className="w-full sm:w-auto px-4 py-2.5 rounded-lg border border-admin-outline-variant/30 text-admin-primary font-bold text-sm flex items-center justify-center gap-2 hover:bg-admin-surface-container-highest transition-colors shadow-sm">
+            <Download size={18} />
+            Ekspor CSV
+          </button>
+        </div>
+      </div>
 
-        {/* Filter Pills */}
-        <div className="flex items-center gap-2 mt-5 overflow-x-auto hide-scrollbar pb-1">
-          {['Semua', 'Menunggu', 'Diproses'].map((tab) => (
+      {/* Header Search & Refersh (Additional) */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+        <div className="relative w-full sm:w-96">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-admin-on-surface-variant" size={18} />
+          <input 
+            type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-admin-surface-container-high border border-admin-outline-variant/50 rounded-lg py-2.5 pl-10 pr-4 text-sm font-semibold text-admin-on-surface placeholder:text-admin-on-surface-variant focus:outline-none focus:border-admin-primary-container focus:ring-1 focus:ring-admin-primary-container transition-all" 
+            placeholder="Cari pesanan atau pelanggan..."
+          />
+        </div>
+        <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+          <button onClick={() => fetchPesanan(false)} className="px-4 py-2.5 rounded-lg bg-admin-surface-container hover:bg-admin-surface-container-high text-admin-on-surface font-bold text-sm flex items-center justify-center transition-colors border border-admin-outline-variant/30" title="Segarkan Data">
+            <RefreshCw size={16} className={`mr-2 ${isLoading ? "animate-spin" : ""}`} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2 mb-6">
+        {['Semua', 'Menunggu', 'Diproses', 'Selesai'].map((tab) => {
+          const isActive = filter === tab;
+          const displayTab = tab === 'Semua' ? 'Semua Pesanan' : tab;
+          return (
             <button 
               key={tab} onClick={() => setFilter(tab)}
-              className={`px-4 py-1.5 rounded-full text-sm font-bold border transition-colors whitespace-nowrap ${
-                filter === tab 
-                  ? 'bg-[#7c3aed] text-[#ede0ff] border-[#630ed4]' 
-                  : 'bg-[#f3ebfa] hover:bg-[#e8dfee] text-[#4a4455] border-transparent'
+              className={`px-4 py-2 rounded-full font-bold text-sm transition-all border ${
+                isActive 
+                  ? 'bg-admin-primary-container text-admin-on-primary-container border-transparent shadow-[0_0_15px_rgba(167,221,199,0.1)]' 
+                  : 'bg-admin-surface-container text-admin-on-surface-variant hover:bg-admin-surface-container-highest border-transparent hover:border-admin-outline-variant/50'
               }`}
             >
-              {tab === 'Semua' ? 'Semua Pesanan' : tab} 
-              <span className="ml-1 opacity-80 font-medium">({counts[tab as keyof typeof counts]})</span>
+              {displayTab} <span className="ml-2 opacity-70 font-semibold">{counts[tab as keyof typeof counts]}</span>
             </button>
-          ))}
-        </div>
-      </section>
-
-      {/* Order Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-10">
-        
-        {isLoading ? (
-          <div className="col-span-full py-12 text-center text-[#7b7487] text-sm animate-pulse font-bold">Sinkronisasi data pesanan...</div>
-        ) : filteredPesanan.length === 0 ? (
-          <div className="col-span-full py-16 flex flex-col items-center justify-center text-[#ccc3d8]">
-            <ReceiptText size={48} className="mb-3 text-[#e8dfee]" />
-            <p className="text-sm font-bold text-[#7b7487]">Tidak ada pesanan di kategori ini.</p>
-          </div>
-        ) : filteredPesanan.map((order) => {
-          const shortId = `#ORD-${order.id.toString().padStart(4, '0')}`;
-          const dateObj = new Date(order.created_at);
-          const timeString = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-          const dateString = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
-          const config = getStatusConfig(order.status);
-          const inisial = order.nama_pelanggan.substring(0, 1).toUpperCase();
-
-          return (
-            <div key={order.id} className={`bg-white rounded-xl p-6 flex flex-col gap-6 border border-[#ccc3d8]/40 shadow-sm hover:shadow-md hover:border-[#d2bbff] transition-all duration-300 ${order.status === 'Selesai' ? 'opacity-60' : ''}`}>
-              
-              {/* Card Header */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <span className="font-bold text-sm text-[#1d1a24]">{shortId}</span>
-                  <p className="text-xs font-medium text-[#7b7487] mt-1">{dateString}, {timeString} WIB</p>
-                </div>
-                <span className={`${config.badgeBg} ${config.badgeText} text-[11px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 shadow-sm`}>
-                  {config.icon} {order.status}
-                </span>
-              </div>
-
-              {/* Customer Info */}
-              <div className="flex gap-4 items-center">
-                <div className="w-10 h-10 shrink-0 rounded-full bg-[#eaddff] text-[#5a00c6] flex items-center justify-center text-lg font-black">
-                  {inisial}
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-sm text-[#1d1a24]">{order.nama_pelanggan}</span>
-                  <span className="text-xs font-medium text-[#4a4455] flex items-start gap-1 mt-0.5 leading-tight">
-                    <MapPin size={14} className="shrink-0 mt-0.5 text-[#7b7487]" />
-                    <span className="line-clamp-2">{order.alamat}</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Items List (Lumina Grey Box) */}
-              <div className="bg-[#f3ebfa] rounded-lg p-4 flex flex-col gap-3 border border-[#e8dfee]">
-                <p className="text-[10px] font-black text-[#7b7487] uppercase tracking-wider mb-1">Detail Pesanan</p>
-                {order.item_pesanan?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex justify-between items-start text-sm font-medium text-[#1d1a24] gap-4">
-                    <span className="leading-tight"><span className="font-black text-[#630ed4]">{item.quantity}x</span> {item.name}</span>
-                    <span className="text-[#4a4455] shrink-0">Rp {(item.price * item.quantity).toLocaleString('id-ID')}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Total & Actions */}
-              <div className="mt-auto pt-4 border-t border-[#ccc3d8]/30 flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-[#4a4455]">Total Pembayaran</span>
-                  <span className="text-xl font-black text-[#630ed4]">Rp {order.total_harga.toLocaleString('id-ID')}</span>
-                </div>
-
-                <div className="flex gap-3">
-                  <a 
-                    href={`https://wa.me/62${order.whatsapp?.replace(/^0/, '')}?text=Halo%20${order.nama_pelanggan},%20pesanan%20${shortId}%20sedang%20kami%20proses.`}
-                    target="_blank" rel="noreferrer"
-                    className="flex-1 bg-[#f9f1ff] hover:bg-[#e8dfee] text-[#1d1a24] text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors border border-[#e8dfee]"
-                  >
-                    <MessageCircle size={18} className="text-[#059669]" /> Chat
-                  </a>
-                  
-                  <button 
-                    onClick={() => updateStatus(order.id, order.status)}
-                    disabled={config.disabled}
-                    className={`flex-[1.5] ${config.btnBg} ${config.btnText} ${config.btnHover} text-sm font-bold py-2.5 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm disabled:cursor-not-allowed`}
-                  >
-                    {config.btnIcon} {config.btnLabel}
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          );
+          )
         })}
       </div>
+
+      {/* Data Table Card */}
+      <div className="bg-admin-surface-container rounded-xl overflow-hidden border border-admin-surface-container-highest shadow-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[900px]">
+            <thead className="bg-admin-surface-container-high border-b border-admin-surface-container-highest">
+              <tr>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">ID Pesanan</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Pelanggan</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Tanggal & Waktu</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Ringkasan Item</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider text-right">Total Harga</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider">Status</th>
+                <th className="py-4 px-6 text-xs font-bold text-admin-on-surface-variant uppercase tracking-wider text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-admin-surface-container-highest">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="py-12 text-center text-admin-on-surface-variant font-semibold animate-pulse">Memuat data pesanan...</td>
+                </tr>
+              ) : filteredPesanan.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-16 text-center text-admin-on-surface-variant font-semibold">Tidak ada pesanan yang sesuai.</td>
+                </tr>
+              ) : filteredPesanan.map((order) => {
+                const shortId = `#ORD-${order.id.toString().padStart(4, '0')}`;
+                const dateObj = new Date(order.created_at);
+                const timeString = dateObj.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const dateString = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                const style = getStatusStyle(order.status);
+                const inisial = order.nama_pelanggan.substring(0, 2).toUpperCase();
+                
+                // Ringkasan Item
+                let itemsSummary = "-";
+                if (order.item_pesanan && order.item_pesanan.length > 0) {
+                  const firstItem = order.item_pesanan[0].name;
+                  const moreCount = order.item_pesanan.length - 1;
+                  itemsSummary = moreCount > 0 ? `${firstItem} + ${moreCount} lainnya` : firstItem;
+                }
+
+                // Cek apakah hari ini
+                const isToday = new Date().toDateString() === dateObj.toDateString();
+                const displayDate = isToday ? `Hari ini, ${timeString} WIB` : `${dateString}, ${timeString} WIB`;
+
+                const rawStatus = (order.status || '').trim().toLowerCase() || 'menunggu';
+
+                return (
+                  <tr key={order.id} className="hover:bg-admin-surface-container-high transition-colors group">
+                    <td className="py-4 px-6 text-sm text-admin-on-surface font-bold">{shortId}</td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-admin-surface-container-highest text-admin-on-surface flex items-center justify-center text-xs font-bold border border-admin-outline-variant/30 shrink-0">
+                          {inisial}
+                        </div>
+                        <span className="text-sm font-semibold text-admin-on-surface line-clamp-1">{order.nama_pelanggan}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 text-sm font-medium text-admin-on-surface-variant">{displayDate}</td>
+                    <td className="py-4 px-6 text-sm font-medium text-admin-on-surface-variant max-w-[200px] truncate" title={itemsSummary}>{itemsSummary}</td>
+                    <td className="py-4 px-6 text-sm text-admin-on-surface text-right font-bold tracking-tight">Rp {order.total_harga.toLocaleString('id-ID')}</td>
+                    <td className="py-4 px-6">
+                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${style.badge}`}>
+                        {rawStatus === 'selesai' ? (
+                          <CheckCheck size={12} className="shrink-0" />
+                        ) : (
+                          <span className={`w-1.5 h-1.5 rounded-full ${style.dot}`}></span>
+                        )}
+                        {style.label}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-right">
+                      <div className="flex items-center justify-end gap-2 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                        <a 
+                          href={`https://wa.me/62${(order.whatsapp || '').replace(/^0/, '')}?text=Halo%20${order.nama_pelanggan},%20pesanan%20${shortId}%20sedang%20kami%20proses.`}
+                          target="_blank" rel="noreferrer"
+                          className="p-2 rounded-md hover:bg-admin-surface-container-highest text-admin-primary-container transition-colors"
+                          title="Chat via WhatsApp"
+                        >
+                          <MessageCircle size={18} />
+                        </a>
+                        <button 
+                          onClick={() => window.open(`/nota?id=${order.id}`, '_blank')}
+                          className="p-2 rounded-md hover:bg-admin-surface-container-highest text-admin-on-surface-variant transition-colors"
+                          title="Cetak Struk Thermal"
+                        >
+                          <Printer size={18} />
+                        </button>
+                        <Link 
+                          href={`/admin/pesanan/${order.id}`}
+                          className="p-2 rounded-md hover:bg-admin-surface-container-highest text-admin-on-surface-variant transition-colors"
+                          title="Lihat Detail Pesanan"
+                        >
+                          <Eye size={18} />
+                        </Link>
+                        {rawStatus !== 'selesai' && (
+                          <button 
+                            onClick={() => updateStatus(order.id, order.status)}
+                            className="px-3 py-1.5 ml-1 rounded-md border border-admin-primary/50 text-admin-on-primary-container bg-admin-primary hover:bg-admin-primary-fixed transition-colors text-xs font-bold shadow-sm"
+                          >
+                            {rawStatus === 'menunggu' ? 'Proses' : 'Selesaikan'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination Footer */}
+        {!isLoading && filteredPesanan.length > 0 && (
+          <div className="px-6 py-4 bg-admin-surface-container-low border-t border-admin-surface-container-highest flex flex-col sm:flex-row items-center justify-between gap-4">
+            <span className="text-sm font-medium text-admin-on-surface-variant">Menampilkan {filteredPesanan.length} pesanan</span>
+            <div className="flex gap-1">
+              <button onClick={() => alert('Halaman sebelumnya')} className="p-2 rounded-lg hover:bg-admin-surface-container-highest text-admin-on-surface-variant transition-colors">
+                <ChevronLeft size={20} />
+              </button>
+              <button className="w-10 h-10 rounded-lg bg-admin-surface-container-highest text-admin-on-surface font-bold text-sm flex items-center justify-center">1</button>
+              <button onClick={() => alert('Halaman selanjutnya')} className="p-2 rounded-lg hover:bg-admin-surface-container-highest text-admin-on-surface-variant transition-colors">
+                <ChevronRight size={20} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
     </main>
   );
 }
