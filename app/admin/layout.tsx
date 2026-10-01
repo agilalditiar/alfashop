@@ -50,6 +50,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/login'); 
   };
 
+  if (pathname === '/admin/kasir') {
+    return <>{children}</>;
+  }
+
   return (
     <>
       <style dangerouslySetInnerHTML={{__html: `
